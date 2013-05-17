@@ -3,7 +3,7 @@ LD=clang++ -std=c++11
 
 all: bwm
 
-bwm: main.o
+bwm: main.o display.o
 	$(LD) $(LDFLAGS) $(shell pkg-config --libs x11) -o$@ $^
 
 %.o: %.cpp
