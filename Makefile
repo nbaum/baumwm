@@ -3,13 +3,13 @@ LD=clang++ -std=c++11
 
 all: bwm
 
-bwm: main.o display.o
+bwm: main.o
 	$(LD) $(LDFLAGS) $(shell pkg-config --libs x11) -o$@ $^
 
 %.o: %.cpp
 	$(CXX) -c -o$@ $(CXXFLAGS) $<
 
-test: bwm
+test: all
 	DISPLAY=:1 ./bwm
 
 clean:

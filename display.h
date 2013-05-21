@@ -1,6 +1,27 @@
 #ifndef display_h
 #define display_h
 
+#include <vector>
+
+struct Mode
+{
+  Mode ();
+  void process_events ();
+protected:
+  virtual void configure_request (const XConfigureRequestEvent &event);
+private:
+  std::vector<XEvent> events;
+};
+
+struct ModeStack
+{
+  ModeStack();
+  void enter (Mode *mode);
+  void exit ();
+private:
+  std::vector<Mode *> modes;
+};
+
 extern Display *dpy;
 extern Window root;
 
@@ -14,6 +35,8 @@ void event_loop (int mask = -1);
 
 void listen (int type, bool (*handler) (XEvent));
 void unlisten (int type, bool (*handler) (XEvent));
+
+const char *XEventName (int type);
 
 #define EVENT_TYPE(T) \
 inline void listen (int type, bool (*handler) (T)) \
