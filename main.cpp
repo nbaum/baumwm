@@ -123,8 +123,12 @@ void update_name (XClient &client)
 {
   char *name;
   XFetchName(dpy, client.child, &name);
-  client.title = name;
-  XFree(name);
+  if (name) {
+    client.title = name;
+    XFree(name);
+  } else {
+    client.title = "Untitled Window";
+  }
   XDrawFrame(client, &client == focused);
 }
 
@@ -177,8 +181,8 @@ void button_press (XButtonPressedEvent& event)
       attr.height = client.height;
     }
     start = event;
-    hf = 3 * (start.x - attr.x) / attr.width - 1;
-    vf = 3 * (start.y - attr.y) / attr.height - 1;
+    hf = std::max(-1, std::min(1, 3 * (start.x - attr.x) / attr.width - 1));
+    vf = std::max(-1, std::min(1, 3 * (start.y - attr.y) / attr.height - 1));
     int cursors[] = {XC_top_left_corner, XC_top_side, XC_top_right_corner, XC_left_side, XC_circle, XC_right_side, XC_bottom_left_corner, XC_bottom_side, XC_bottom_right_corner};
     int cursor = cursors[4 + hf + 3 * vf];
     start.x = start.x_root;
@@ -197,15 +201,17 @@ void button_press (XButtonPressedEvent& event)
 
 void move_resize (XClient& client, int x, int y, int width, int height)
 {
-  printf("movesizing to %ix%i+%i+%i\n", width, height, x, y);
+  width = std::max(15, width);
+  height = std::max(15, height);
+  //printf("movesizing to %ix%i+%i+%i\n", width, height, x, y);
   XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
   XResizeWindow(dpy, client.child, width, height);
   XConfigureEvent ev = {
     .type = ConfigureNotify,
     .event = client.child,
     .window = client.child,
-    .x = x,
-    .y = y - HeadlineHeight,
+    .x = x + 4,
+    .y = y + HeadlineHeight,
     .width = width,
     .height = height
   };
@@ -258,7 +264,18 @@ void button_release (XButtonReleasedEvent& event)
 void configure (XConfigureRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
-  printf("clients wants to be at %i+%i\n", event.x, event.y);
+  printf("client wants to be ");
+  if (event.value_mask & CWWidth)
+    printf("%i", event.width);
+  if (event.value_mask & CWHeight)
+    printf("x%i", event.height);
+  if (event.value_mask & (CWX | CWY))
+    printf("+");
+  if (event.value_mask & CWX)
+    printf("%i", event.x);
+  if (event.value_mask & CWY)
+    printf("+%i", event.y);
+  printf("\n");
   if (event.value_mask & CWX) client.x = event.x;
   if (event.value_mask & CWY) client.y = event.y;
   if (event.value_mask & CWWidth) client.width = event.width;
@@ -283,7 +300,7 @@ void map (XMapRequestEvent& event)
   move_resize(client, attr.x, attr.y, attr.width, attr.height + 15);
   XMapWindow(dpy, event.window);
   XMapWindow(dpy, client.frame);
-  //XSetWMState(client, 1);
+  XSetWMState(client, 1);
   XSetWindowBorderWidth(dpy, client.child, 0);
   update_name(client);
 }
@@ -298,7 +315,7 @@ void unmap (XUnmapEvent& event)
   auto &client = XFindClient(event.window, False);
   if (&client) {
     XUnmapWindow(dpy, client.frame);
-    //XSetWMState(client, 0);
+    XSetWMState(client, 0);
     if (&client == focused)
       focused = 0;
   }
@@ -410,6 +427,9 @@ void key_press (XKeyPressedEvent& event)
 
 int error (Display *dpy, XErrorEvent *error)
 {
+  char buff[80];
+  XGetErrorText(dpy, error->error_code, buff, 80);
+  printf("%s\n", buff);
   return 0;
 }
 
@@ -422,8 +442,6 @@ int main ()
   active_frame_pixel   = XMakeColor(dpy, "rgb:f/0/0");
   frame_text_pixel     = XMakeColor(dpy, "rgb:f/f/f");
   inactive_frame_pixel = XMakeColor(dpy, "rgb:8/8/8");
-  //system("killall xterm");
-  //spawn("xterm");
   XA_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
   root = DefaultRootWindow(dpy);
   XSetErrorHandler(error);
@@ -440,24 +458,20 @@ int main ()
       Atom t;
       int f;
       unsigned long n, b;
-      XGetWindowProperty(dpy, client.child, XInternAtom(dpy, "_NET_WM_DESKTOP", True), 0, 1, False, AnyPropertyType, &t, &f, &n, &b, (unsigned char **) &num);
-      if (num) {
+      XGetWindowProperty(dpy, client.child, XInternAtom(dpy, "_NET_WM_DESKTOP", True),
+                         0, 1, False, AnyPropertyType, &t, &f, &n, &b,
+                         (unsigned char **) &num);
+      if (n) {
         set_desktop(client, *num);
         XFree(num);
       } else {
         set_desktop(client, client.desktop);
       }
-      {
-        int num;
-        Atom *a = XListProperties(dpy, client.child, &num);
-        for (int i = 0; i < num; ++i)
-          printf("%s\n", XGetAtomName(dpy, a[i]));
-        XFree(a);
-      }
       XSetWindowBorderWidth(dpy, client.child, 0);
       XMapWindow(dpy, client.child);
       XMapWindow(dpy, client.frame);
       XClearWindow(dpy, client.frame);
+      XSetWMState(client, 1);
       update_name(client);
     }
   }
