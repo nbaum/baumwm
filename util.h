@@ -1,6 +1,8 @@
 #ifndef util_h
 #define util_h
 
+extern int ModMask;
+
 inline unsigned long XMakeColor (Display *dpy, const char *s)
 {
   XColor color;
@@ -25,7 +27,7 @@ inline void parse_modifiers (const char *&spec, int &mask)
       mask |= Mod1Mask;
       break;
     case 'M':
-      mask |= Mod2Mask;
+      mask |= ModMask;
       break;
     }
   }
@@ -43,11 +45,19 @@ inline void parse_button (const char *spec, int &button, int &mask)
   button = atoi(spec);
 }
 
+inline bool match_key (XKeyEvent& event, const char *spec)
+{
+  int sym, mask;
+  parse_key(spec, sym, mask);
+  return event.keycode == XKeysymToKeycode(event.display, sym) && event.state == mask;
+}
+
 inline void grab_key (Display *dpy, Window w, const char *spec)
 {
   int sym, mask;
   parse_key(spec, sym, mask);
-  XGrabKey(dpy, sym, mask, w, True, GrabModeAsync, GrabModeAsync);
+  printf("Grabbing %s: %x %x\n", spec, XKeysymToKeycode(dpy, sym), mask);
+  XGrabKey(dpy, XKeysymToKeycode(dpy, sym), mask, w, True, GrabModeAsync, GrabModeAsync);
 }
 
 inline void grab_button (Display *dpy, Window w, const char *spec)
