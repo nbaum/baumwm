@@ -239,7 +239,11 @@ void configure (XConfigureRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
   printf("clients wants to be at %i+%i\n", event.x, event.y);
-  move_resize(client, event.x, event.y, event.width, event.height);
+  if (event.value_mask & CWX) client.x = event.x;
+  if (event.value_mask & CWY) client.y = event.y;
+  if (event.value_mask & CWWidth) client.width = event.width;
+  if (event.value_mask & CWHeight) client.height = event.height;
+  move_resize(client, client.x, client.y, client.width, client.height);
   XSetWindowBorderWidth(dpy, client.child, 0);
 }
 
