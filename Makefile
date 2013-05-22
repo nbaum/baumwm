@@ -15,4 +15,4 @@ test: all
 clean:
 	$(RM) bwm main.o
 
-main.cpp: display.h
+main.cpp: util.h
