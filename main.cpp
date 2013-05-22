@@ -147,7 +147,11 @@ void button_press (XButtonPressedEvent& event)
                   event.time);
       start = event;
     } else if (event.button == 2) {
-      XLowerWindow(dpy, event.subwindow);
+      if (event.state & ShiftMask) {
+        XLowerWindow(dpy, event.subwindow);
+      } else {
+        XRaiseWindow(dpy, event.subwindow);
+      }
     } else {
       XGetWindowAttributes(dpy, event.subwindow, &attr);
       start = event;
@@ -531,6 +535,7 @@ int main ()
   grab_key(dpy, root, "C-M-S-9");
   grab_button(dpy, root, "M-1");
   grab_button(dpy, root, "M-2");
+  grab_button(dpy, root, "M-S-2");
   grab_button(dpy, root, "M-3");
   XSetEventHandler(KeyPress, key_press);
   XSetEventHandler(Expose, expose);
