@@ -10,8 +10,6 @@
 
 #include "util.h"
 
-int ModMask = Mod1Mask;
-
 void spawn (const char *command)
 {
   if (!fork()) {
@@ -20,6 +18,7 @@ void spawn (const char *command)
   }
 }
 
+XWindowAttributes attr;
 XButtonEvent start;
 int hf, vf;
 Display *dpy;
@@ -37,7 +36,6 @@ struct XClient
   std::string title;
   int x, y, width, height;
   unsigned int desktop_mask;
-  XWindowAttributes attr;
 };
 
 std::map<Window, XClient *> clients;
@@ -135,10 +133,9 @@ void focus (XClient& client, Window window = None)
 
 void button_press (XButtonPressedEvent& event)
 {
-  auto &client = XFindClient(start.subwindow, False);
-  if (&client && event.window == root) {
+  if (event.window == root) {
     if (event.button == 1) {
-      XGetWindowAttributes(dpy, event.subwindow, &client.attr);
+      XGetWindowAttributes(dpy, event.subwindow, &attr);
       XGrabPointer(dpy, event.subwindow, True,
                   ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
                   GrabModeAsync, root, XCreateFontCursor(dpy, XC_fleur),
@@ -147,18 +144,18 @@ void button_press (XButtonPressedEvent& event)
     } else if (event.button == 2) {
       XLowerWindow(dpy, event.subwindow);
     } else {
-      XGetWindowAttributes(dpy, event.subwindow, &client.attr);
+      XGetWindowAttributes(dpy, event.subwindow, &attr);
       start = event;
-      hf = 3 * (start.x - client.attr.x) / client.attr.width - 1;
-      vf = 3 * (start.y - client.attr.y) / client.attr.height - 1;
+      hf = 3 * (start.x - attr.x) / attr.width - 1;
+      vf = 3 * (start.y - attr.y) / attr.height - 1;
       int cursors[] = {XC_top_left_corner, XC_top_side, XC_top_right_corner, XC_left_side, XC_circle, XC_right_side, XC_bottom_left_corner, XC_bottom_side, XC_bottom_right_corner};
       int cursor = cursors[4 + hf + 3 * vf];
       start.x = start.x_root;
       start.y = start.y_root;
-      if (hf < 0)  start.x_root = client.attr.x;
-      if (hf > 0)  start.x_root = client.attr.x + client.attr.width;
-      if (vf < 0)  start.y_root = client.attr.y;
-      if (vf > 0)  start.y_root = client.attr.y + client.attr.height;
+      if (hf < 0)  start.x_root = attr.x;
+      if (hf > 0)  start.x_root = attr.x + attr.width;
+      if (vf < 0)  start.y_root = attr.y;
+      if (vf > 0)  start.y_root = attr.y + attr.height;
       XWarpPointer(dpy, None, root, 0, 0, 0, 0, start.x_root, start.y_root);
       XGrabPointer(dpy, event.subwindow, True,
                   ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
@@ -194,7 +191,6 @@ void move_resize (XClient& client, int x, int y, int width, int height)
 void motion (XMotionEvent& event)
 {
   auto &client = XFindClient(start.subwindow, False);
-  XWindowAttributes &attr = client.attr;
   if (!&client) return;
   if (start.button == 1) {
     XWindowAttributes rattr;
@@ -249,7 +245,6 @@ void XSetWMState (XClient& client, int state)
 void map (XMapRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
-  XWindowAttributes attr;
   XGetWindowAttributes(dpy, event.window, &attr);
   move_resize(client, attr.x, attr.y, attr.width, attr.height + 15);
   XMapWindow(dpy, event.window);
@@ -362,80 +357,78 @@ void flip_desktop (XClient& client, unsigned int mask)
 void key_press (XKeyPressedEvent& event)
 {
   auto &client = XFindClient(event.subwindow, False);
-  if (match_key(event, "M-1")) {
+  if (match_key(event, "A-1")) {
     set_desktop(1);
-  } else if (match_key(event, "M-2")) {
+  } else if (match_key(event, "A-2")) {
     set_desktop(2);
-  } else if (match_key(event, "M-3")) {
+  } else if (match_key(event, "A-3")) {
     set_desktop(4);
-  } else if (match_key(event, "M-4")) {
+  } else if (match_key(event, "A-4")) {
     set_desktop(8);
-  } else if (match_key(event, "M-5")) {
+  } else if (match_key(event, "A-5")) {
     set_desktop(16);
-  } else if (match_key(event, "M-6")) {
+  } else if (match_key(event, "A-6")) {
     set_desktop(32);
-  } else if (match_key(event, "M-7")) {
+  } else if (match_key(event, "A-7")) {
     set_desktop(64);
-  } else if (match_key(event, "M-8")) {
+  } else if (match_key(event, "A-8")) {
     set_desktop(128);
-  } else if (match_key(event, "M-9")) {
+  } else if (match_key(event, "A-9")) {
     set_desktop(256);
-  } else if (match_key(event, "M-S-1")) {
+  } else if (match_key(event, "A-S-1")) {
     set_desktop(client, 1);
-  } else if (match_key(event, "M-S-2")) {
+  } else if (match_key(event, "A-S-2")) {
     set_desktop(client, 2);
-  } else if (match_key(event, "M-S-3")) {
+  } else if (match_key(event, "A-S-3")) {
     set_desktop(client, 4);
-  } else if (match_key(event, "M-S-4")) {
+  } else if (match_key(event, "A-S-4")) {
     set_desktop(client, 8);
-  } else if (match_key(event, "M-S-5")) {
+  } else if (match_key(event, "A-S-5")) {
     set_desktop(client, 16);
-  } else if (match_key(event, "M-S-6")) {
+  } else if (match_key(event, "A-S-6")) {
     set_desktop(client, 32);
-  } else if (match_key(event, "M-S-7")) {
+  } else if (match_key(event, "A-S-7")) {
     set_desktop(client, 64);
-  } else if (match_key(event, "M-S-8")) {
+  } else if (match_key(event, "A-S-8")) {
     set_desktop(client, 128);
-  } else if (match_key(event, "M-S-9")) {
+  } else if (match_key(event, "A-S-9")) {
     set_desktop(client, 256);
-  } else if (match_key(event, "M-C-S-1")) {
+  } else if (match_key(event, "A-C-S-1")) {
     flip_desktop(client, 1);
-  } else if (match_key(event, "M-C-S-2")) {
+  } else if (match_key(event, "A-C-S-2")) {
     flip_desktop(client, 2);
-  } else if (match_key(event, "M-C-S-3")) {
+  } else if (match_key(event, "A-C-S-3")) {
     flip_desktop(client, 4);
-  } else if (match_key(event, "M-C-S-4")) {
+  } else if (match_key(event, "A-C-S-4")) {
     flip_desktop(client, 8);
-  } else if (match_key(event, "M-C-S-5")) {
+  } else if (match_key(event, "A-C-S-5")) {
     flip_desktop(client, 16);
-  } else if (match_key(event, "M-C-S-6")) {
+  } else if (match_key(event, "A-C-S-6")) {
     flip_desktop(client, 32);
-  } else if (match_key(event, "M-C-S-7")) {
+  } else if (match_key(event, "A-C-S-7")) {
     flip_desktop(client, 64);
-  } else if (match_key(event, "M-C-S-8")) {
+  } else if (match_key(event, "A-C-S-8")) {
     flip_desktop(client, 128);
-  } else if (match_key(event, "M-C-S-9")) {
+  } else if (match_key(event, "A-C-S-9")) {
     flip_desktop(client, 256);
-  } else if (match_key(event, "M-C-1")) {
+  } else if (match_key(event, "A-C-1")) {
     flip_desktop(1);
-  } else if (match_key(event, "M-C-2")) {
+  } else if (match_key(event, "A-C-2")) {
     flip_desktop(2);
-  } else if (match_key(event, "M-C-3")) {
+  } else if (match_key(event, "A-C-3")) {
     flip_desktop(4);
-  } else if (match_key(event, "M-C-4")) {
+  } else if (match_key(event, "A-C-4")) {
     flip_desktop(8);
-  } else if (match_key(event, "M-C-5")) {
+  } else if (match_key(event, "A-C-5")) {
     flip_desktop(16);
-  } else if (match_key(event, "M-C-6")) {
+  } else if (match_key(event, "A-C-6")) {
     flip_desktop(32);
-  } else if (match_key(event, "M-C-7")) {
+  } else if (match_key(event, "A-C-7")) {
     flip_desktop(64);
-  } else if (match_key(event, "M-C-8")) {
+  } else if (match_key(event, "A-C-8")) {
     flip_desktop(128);
-  } else if (match_key(event, "M-C-9")) {
+  } else if (match_key(event, "A-C-9")) {
     flip_desktop(256);
-  } else if (match_key(event, "M-Return")) {
-    spawn(getenv("TERMINAL"));
   }
 }
 
@@ -456,7 +449,6 @@ int main ()
   unsigned int nchildren;
   XQueryTree(dpy, root, &root, &parent, &children, &nchildren);
   for (int j = 0; j < nchildren; j++) {
-    XWindowAttributes attr;
     XGetWindowAttributes(dpy, children[j], &attr);
     if (!attr.override_redirect && attr.map_state == IsViewable) {
       auto &client = XFindClient(children[j], True);
@@ -476,46 +468,45 @@ int main ()
   XDefineCursor(dpy, root, XCreateFontCursor(dpy, XC_left_ptr));
   XSetWindowBackground(dpy, root, XMakeColor(dpy, "rgb:4/6/8"));
   XClearWindow(dpy, root);
-  grab_key(dpy, root, "M-1");
-  grab_key(dpy, root, "M-2");
-  grab_key(dpy, root, "M-3");
-  grab_key(dpy, root, "M-4");
-  grab_key(dpy, root, "M-5");
-  grab_key(dpy, root, "M-6");
-  grab_key(dpy, root, "M-7");
-  grab_key(dpy, root, "M-8");
-  grab_key(dpy, root, "M-9");
-  grab_key(dpy, root, "M-S-1");
-  grab_key(dpy, root, "M-S-2");
-  grab_key(dpy, root, "M-S-3");
-  grab_key(dpy, root, "M-S-4");
-  grab_key(dpy, root, "M-S-5");
-  grab_key(dpy, root, "M-S-6");
-  grab_key(dpy, root, "M-S-7");
-  grab_key(dpy, root, "M-S-8");
-  grab_key(dpy, root, "M-S-9");
-  grab_key(dpy, root, "M-C-1");
-  grab_key(dpy, root, "M-C-2");
-  grab_key(dpy, root, "M-C-3");
-  grab_key(dpy, root, "M-C-4");
-  grab_key(dpy, root, "M-C-5");
-  grab_key(dpy, root, "M-C-6");
-  grab_key(dpy, root, "M-C-7");
-  grab_key(dpy, root, "M-C-8");
-  grab_key(dpy, root, "M-C-9");
-  grab_key(dpy, root, "M-C-S-1");
-  grab_key(dpy, root, "M-C-S-2");
-  grab_key(dpy, root, "M-C-S-3");
-  grab_key(dpy, root, "M-C-S-4");
-  grab_key(dpy, root, "M-C-S-5");
-  grab_key(dpy, root, "M-C-S-6");
-  grab_key(dpy, root, "M-C-S-7");
-  grab_key(dpy, root, "M-C-S-8");
-  grab_key(dpy, root, "M-C-S-9");
-  grab_key(dpy, root, "M-Return");
-  grab_button(dpy, root, "M-1");
-  grab_button(dpy, root, "M-2");
-  grab_button(dpy, root, "M-3");
+  grab_key(dpy, root, "A-1");
+  grab_key(dpy, root, "A-2");
+  grab_key(dpy, root, "A-3");
+  grab_key(dpy, root, "A-4");
+  grab_key(dpy, root, "A-5");
+  grab_key(dpy, root, "A-6");
+  grab_key(dpy, root, "A-7");
+  grab_key(dpy, root, "A-8");
+  grab_key(dpy, root, "A-9");
+  grab_key(dpy, root, "A-S-1");
+  grab_key(dpy, root, "A-S-2");
+  grab_key(dpy, root, "A-S-3");
+  grab_key(dpy, root, "A-S-4");
+  grab_key(dpy, root, "A-S-5");
+  grab_key(dpy, root, "A-S-6");
+  grab_key(dpy, root, "A-S-7");
+  grab_key(dpy, root, "A-S-8");
+  grab_key(dpy, root, "A-S-9");
+  grab_key(dpy, root, "C-A-1");
+  grab_key(dpy, root, "C-A-2");
+  grab_key(dpy, root, "C-A-3");
+  grab_key(dpy, root, "C-A-4");
+  grab_key(dpy, root, "C-A-5");
+  grab_key(dpy, root, "C-A-6");
+  grab_key(dpy, root, "C-A-7");
+  grab_key(dpy, root, "C-A-8");
+  grab_key(dpy, root, "C-A-9");
+  grab_key(dpy, root, "C-A-S-1");
+  grab_key(dpy, root, "C-A-S-2");
+  grab_key(dpy, root, "C-A-S-3");
+  grab_key(dpy, root, "C-A-S-4");
+  grab_key(dpy, root, "C-A-S-5");
+  grab_key(dpy, root, "C-A-S-6");
+  grab_key(dpy, root, "C-A-S-7");
+  grab_key(dpy, root, "C-A-S-8");
+  grab_key(dpy, root, "C-A-S-9");
+  grab_button(dpy, root, "A-1");
+  grab_button(dpy, root, "A-2");
+  grab_button(dpy, root, "A-3");
   XSetEventHandler(KeyPress, key_press);
   XSetEventHandler(Expose, expose);
   XSetEventHandler(ButtonPress, button_press);
