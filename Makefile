@@ -15,7 +15,4 @@ test: all
 clean:
 	$(RM) bwm main.o
 
-depend: main.cpp
-	$(CXX) $(CXXFLAGS) -M main.cpp > Makefile.depends
-
-include Makefile.depends
+main.cpp: display.h
