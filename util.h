@@ -1,6 +1,8 @@
 #ifndef util_h
 #define util_h
 
+extern int ModMask;
+
 inline unsigned long XMakeColor (Display *dpy, const char *s)
 {
   XColor color;
@@ -25,7 +27,7 @@ inline void parse_modifiers (const char *&spec, int &mask)
       mask |= Mod1Mask;
       break;
     case 'M':
-      mask |= Mod2Mask;
+      mask |= ModMask;
       break;
     }
   }
