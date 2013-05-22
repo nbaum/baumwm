@@ -16,3 +16,4 @@ clean:
 	$(RM) bwm main.o
 
 main.cpp: util.h
+

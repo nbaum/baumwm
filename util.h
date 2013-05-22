@@ -56,7 +56,6 @@ inline void grab_key (Display *dpy, Window w, const char *spec)
 {
   int sym, mask;
   parse_key(spec, sym, mask);
-  printf("Grabbing %s: %x %x\n", spec, XKeysymToKeycode(dpy, sym), mask);
   XGrabKey(dpy, XKeysymToKeycode(dpy, sym), mask, w, True, GrabModeAsync, GrabModeAsync);
 }
 
