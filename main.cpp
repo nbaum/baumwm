@@ -1,4 +1,6 @@
+#include <X11/extensions/Xinerama.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -10,18 +12,31 @@
 
 #include "util.h"
 
+int screen_count;
+XineramaScreenInfo *screens;
+
+XineramaScreenInfo *find_screen (int x, int y)
+{
+  for (int i = 0; i < screen_count; ++i) {
+    if (x < screens[i].x_org) continue; 
+    if (y < screens[i].y_org) continue; 
+    if (x > screens[i].x_org + screens[i].width) continue; 
+    if (y > screens[i].y_org + screens[i].height) continue;
+    return &screens[i]; 
+  }
+  return 0;
+}
+
+const char *command;
+
 const int HeadlineHeight = 20;
 
 int ModMask = Mod4Mask;
 
-void spawn (const char *command)
-{
+void spawn (const char *command) {
   if (!fork()) {
-    if (!fork()) {
-      execlp(command, command, NULL);
-      exit(1);
-    }
-    exit(0);
+    execlp("/bin/sh", "/bin/sh", "-c", command, NULL);
+    exit(1);
   }
 }
 
@@ -36,6 +51,11 @@ unsigned int active_frame_pixel;
 unsigned int frame_text_pixel;
 unsigned int inactive_frame_pixel;
 
+struct Geom : XRectangle
+{
+  bool fullscreen;
+};
+
 struct XClient
 {
   Window frame, child;
@@ -43,6 +63,8 @@ struct XClient
   std::string title;
   int x, y, width, height;
   uint32_t desktop;
+  XSizeHints hints;
+  std::map<int, Geom> geom;
 };
 
 std::map<Window, XClient *> clients;
@@ -59,6 +81,25 @@ void XDestroyClient (Window w)
   delete c;
 }
 
+void ProcessHints (XClient& client)
+{
+  long mask;
+  XGetWMNormalHints(dpy, client.child, &client.hints, &mask);
+  if ((client.hints.flags & PMinSize)== 0)
+    client.hints.min_height = client.hints.min_width = 0;
+  if ((client.hints.flags & PMaxSize) == 0)
+    client.hints.max_height = client.hints.max_width = 10000;
+  if ((client.hints.flags & PBaseSize) == 0)
+    client.hints.base_height = client.hints.min_height,
+    client.hints.base_width = client.hints.min_width;
+  if ((client.hints.flags & PResizeInc) == 0)
+    client.hints.width_inc = client.hints.height_inc = 1;
+  auto &h = client.hints;
+  //printf("min: %ix%i\n", h.min_width, h.min_height);
+  //printf("base: %ix%i\n", h.base_width, h.base_height);
+  //printf("size: %ix%i\n", h.width, h.height);
+}
+
 XClient& XFindClient (Window w, bool create)
 {
   auto c = clients[w];
@@ -70,13 +111,13 @@ XClient& XFindClient (Window w, bool create)
     XSetWindowBorder(dpy, frame, BlackPixel(dpy, 0));
     XAddToSaveSet(dpy, w);
     XReparentWindow(dpy, w, frame, 4, HeadlineHeight);
-    //grab_button(dpy, frame, "1");
-    //grab_button(dpy, frame, "2");
-    //grab_button(dpy, frame, "3");
+    int num;
+    Atom *atoms = XListProperties(dpy, w, &num);
     c->gc = XCreateGC(dpy, w, 0, 0);
     XSetFont(dpy, c->gc, XLoadFont(dpy, "-misc-*-*-*-*-*-12-*-*-*-*-*-*-*"));
     XSelectInput(dpy, frame, ButtonPressMask | ExposureMask | EnterWindowMask | SubstructureNotifyMask | SubstructureRedirectMask);
     XSelectInput(dpy, w, PropertyChangeMask | StructureNotifyMask);
+    ProcessHints(*c);
     clients[frame] = clients[w] = c;
   }
   return *c;
@@ -95,7 +136,7 @@ void XEventLoop ()
   for (;;) {
     XEvent event;
     XNextEvent(dpy, &event);
-    //std::cerr << XEventName(event.type) << std::endl;
+    printf("Event: %s\n", XEventName(event.type));
     if (auto fn = event_handlers[event.type])
       fn(event);
   }
@@ -201,9 +242,11 @@ void button_press (XButtonPressedEvent& event)
 
 void move_resize (XClient& client, int x, int y, int width, int height)
 {
-  width = std::max(15, width);
-  height = std::max(15, height);
-  //printf("movesizing to %ix%i+%i+%i\n", width, height, x, y);
+  //printf("%ix%i+%i+%i\n", width, height, x, y);
+  width = std::min(std::max(std::max(15, client.hints.min_width), width), client.hints.max_width);
+  height = std::min(std::max(std::max(15, client.hints.min_height), height), client.hints.max_width);
+  width = width - (width - client.hints.base_width) % client.hints.width_inc;
+  height = height - (height - client.hints.base_height) % client.hints.height_inc;
   XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
   XResizeWindow(dpy, client.child, width, height);
   XConfigureEvent ev = {
@@ -231,14 +274,6 @@ void motion (XMotionEvent& event)
     XGetWindowAttributes(dpy, root, &rattr);
     auto dx = event.x_root - start.x_root;
     auto dy = event.y_root - start.y_root;
-    /*if (event.x_root < start.x_root)
-      dx = (1.0 * event.x_root / start.x_root) * (attr.x + attr.width) - attr.width;
-    else
-      dx = (1.0 - 1.0 * (rattr.width - event.x_root) / (rattr.width - start.x_root)) * (rattr.width - attr.x) + attr.x;
-    if (event.y_root < start.y_root)
-      dy = (1.0 * event.y_root / start.y_root) * (attr.y + attr.height) - attr.height;
-    else
-      dy = (1.0 - 1.0 * (rattr.height - event.y_root) / (rattr.height - start.y_root)) * (rattr.height - attr.y) + attr.y;*/
     move_resize(client, attr.x + dx, attr.y + dy, attr.width, attr.height);
   } else if (start.button == 3) {
     auto dx = event.x_root - start.x_root;
@@ -295,10 +330,8 @@ void XSetWMState (XClient& client, int state)
 void map (XMapRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
-  XWindowAttributes attr;
-  XGetWindowAttributes(dpy, event.window, &attr);
-  move_resize(client, attr.x, attr.y, attr.width, attr.height + 15);
-  XMapWindow(dpy, event.window);
+  move_resize(client, client.x, client.y, client.width, client.height + 15);
+  XMapWindow(dpy, client.child);
   XMapWindow(dpy, client.frame);
   XSetWMState(client, 1);
   XSetWindowBorderWidth(dpy, client.child, 0);
@@ -334,9 +367,10 @@ void message (XClientMessageEvent& event)
   if (event.message_type == XA_NET_WM_STATE) {
     for (int i = 0; i < 5; ++i)
       if (event.data.l[i])
-        std::cerr << XGetAtomName(dpy, event.data.l[i]) << std::endl;
+        ;
+        //std::cerr << XGetAtomName(dpy, event.data.l[i]) << std::endl;
   } else {
-    std::cerr << XGetAtomName(dpy, event.message_type) << std::endl;
+    //std::cerr << XGetAtomName(dpy, event.message_type) << std::endl;
   }
 }
 
@@ -355,6 +389,32 @@ void property (XPropertyEvent& event)
   update_name(client);
 }
 
+template<typename T, typename T2>
+void setprop (Window w, const char *name, const T2 &value)
+{
+  printf("Setting %s to %i\n", name, value);
+  auto atom = XInternAtom(dpy, name, True);
+  T temp = value;
+  XChangeProperty(dpy, w, atom, atom, 8, PropModeReplace, (unsigned char *) &temp, sizeof(temp));
+}
+
+template<typename T, typename T2>
+T getprop (Window w, const char *name, const T2 def)
+{
+  auto atom = XInternAtom(dpy, name, True);
+  T *prop, val;
+  Atom type;
+  int format;
+  unsigned long items, bytes;
+  XGetWindowProperty(dpy, w, atom, 0, sizeof(T) / 4 + 1,
+                     False, AnyPropertyType,
+                     &type, &format, &items, &bytes,
+                     (unsigned char **) &prop);
+  val = prop ? *prop : def;
+  if (prop) XFree(prop);
+  return val;
+}
+
 void set_desktop (uint32_t num)
 {
   printf("dmask %i -> %i\n", current_desktop, num);
@@ -369,6 +429,7 @@ void set_desktop (uint32_t num)
       }
     }
   }
+  setprop<long>(root, "_NET_CURRENT_DESKTOP", num);
 }
 
 void set_desktop (XClient& client, uint32_t num)
@@ -376,7 +437,13 @@ void set_desktop (XClient& client, uint32_t num)
   if (!&client) return;
   client.desktop = num;
   set_desktop(current_desktop);
-  XChangeProperty(dpy, client.child, XInternAtom(dpy, "_NET_WM_DESKTOP", True), XInternAtom(dpy, "CARDINAL", True), 32, PropModeReplace, (unsigned char *) &num, 1);
+  setprop<long>(client.child, "_NET_WM_DESKTOP", num);
+}
+
+const char *getenv (const char *name, const char *def)
+{
+  const char *env = getenv(name);
+  return env ? env : def;
 }
 
 void key_press (XKeyPressedEvent& event)
@@ -419,9 +486,14 @@ void key_press (XKeyPressedEvent& event)
   } else if (match_key(event, "M-S-9")) {
     set_desktop(client, 256);
   } else if (match_key(event, "M-Return")) {
-    spawn(getenv("TERMINAL"));
+    spawn(getenv("TERMINAL", "gnome-terminal"));
   } else if (match_key(event, "M-c")) {
     XDestroyClient(client.child);
+  } else if (match_key(event, "M-q")) {
+    exit(0);
+    execlp(command, command, 0);
+  } else if (match_key(event, "M-f")) {
+    find_screen(event.x_root, event.y_root);
   }
 }
 
@@ -429,14 +501,17 @@ int error (Display *dpy, XErrorEvent *error)
 {
   char buff[80];
   XGetErrorText(dpy, error->error_code, buff, 80);
-  printf("%s\n", buff);
+  fprintf(stderr, "%s\n", buff);
   return 0;
 }
 
-int main ()
+int main (int argc, const char *argv[])
 {
+  command = argv[0];
   if (!(dpy = XOpenDisplay(0)))
     err(1, "failed to start");
+  screens = XineramaQueryScreens(dpy, &screen_count);
+  spawn("xmobar -b");
   XSynchronize(dpy, True);
   current_desktop = 1;
   active_frame_pixel   = XMakeColor(dpy, "rgb:f/0/0");
@@ -453,26 +528,16 @@ int main ()
     XGetWindowAttributes(dpy, children[j], &attr);
     if (!attr.override_redirect && attr.map_state == IsViewable) {
       auto &client = XFindClient(children[j], True);
+      update_name(client);
       move_resize(client, attr.x - 5, attr.y - HeadlineHeight - 1, attr.width, attr.height);
-      uint32_t *num;
-      Atom t;
-      int f;
-      unsigned long n, b;
-      XGetWindowProperty(dpy, client.child, XInternAtom(dpy, "_NET_WM_DESKTOP", True),
-                         0, 1, False, AnyPropertyType, &t, &f, &n, &b,
-                         (unsigned char **) &num);
-      if (n) {
-        set_desktop(client, *num);
-        XFree(num);
-      } else {
-        set_desktop(client, client.desktop);
-      }
+      auto num = getprop<long>(client.child, "_NET_WM_DESKTOP", -1);
       XSetWindowBorderWidth(dpy, client.child, 0);
       XMapWindow(dpy, client.child);
       XMapWindow(dpy, client.frame);
+      set_desktop(client, num > -1 ? num : client.desktop);
+      printf("Window %s is on %li\n", client.title.c_str(), num);
       XClearWindow(dpy, client.frame);
       XSetWMState(client, 1);
-      update_name(client);
     }
   }
   XSelectInput(dpy, root, KeyPressMask | SubstructureRedirectMask);
@@ -481,6 +546,8 @@ int main ()
   XClearWindow(dpy, root);
   grab_key(dpy, root, "M-Return");
   grab_key(dpy, root, "M-c");
+  grab_key(dpy, root, "M-q");
+  grab_key(dpy, root, "M-f");
   grab_key(dpy, root, "M-1");
   grab_key(dpy, root, "M-2");
   grab_key(dpy, root, "M-3");
