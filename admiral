@@ -1,0 +1,6 @@
+#! /bin/sh
+
+admiral.bin
+sleep 0.1
+exec $0
+

@@ -1,6 +1,0 @@
-#! /bin/sh
-
-while true; do
-  ~/bauwm/bwm
-  sleep 0.1
-done
