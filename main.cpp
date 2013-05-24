@@ -136,7 +136,7 @@ XClient& XFindClient (Window w, bool create)
     int num;
     Atom *atoms = XListProperties(dpy, w, &num);
     c->gc = XCreateGC(dpy, w, 0, 0);
-    XSetFont(dpy, c->gc, XLoadFont(dpy, "-misc-*-*-*-*-*-12-*-*-*-*-*-*-*"));
+    XSetFont(dpy, c->gc, XLoadFont(dpy, "-*-profont-*-*-*-*-12-*-*-*-*-*-*-*"));
     XSelectInput(dpy, frame, ButtonPressMask | ExposureMask | EnterWindowMask | SubstructureNotifyMask | SubstructureRedirectMask);
     XSelectInput(dpy, w, PropertyChangeMask | StructureNotifyMask);
     ProcessHints(*c);
