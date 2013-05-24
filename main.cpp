@@ -22,9 +22,9 @@ XineramaScreenInfo *screens;
 XineramaScreenInfo *find_screen (int x, int y)
 {
   for (int i = 0; i < screen_count; ++i) {
-    if (x < screens[i].x_org) continue; 
-    if (y < screens[i].y_org) continue; 
-    if (x > screens[i].x_org + screens[i].width) continue; 
+    if (x < screens[i].x_org) continue;
+    if (y < screens[i].y_org) continue;
+    if (x > screens[i].x_org + screens[i].width) continue;
     if (y > screens[i].y_org + screens[i].height) continue;
     return &screens[i]; 
   }
