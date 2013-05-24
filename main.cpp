@@ -567,6 +567,8 @@ void key_press (XKeyPressedEvent& event)
     } else {
       move_resize(client, client.x - 5, client.y - HeadlineHeight - 1, client.width, client.height);
     }
+  } else if (match_key(event, "M-r")) {
+    spawn("/home/nathan/admiral/libexec/run");
   }
 }
 
@@ -622,6 +624,7 @@ int main (int argc, const char *argv[])
   grab_key(dpy, root, "M-q");
   grab_key(dpy, root, "M-f");
   grab_key(dpy, root, "M-m");
+  grab_key(dpy, root, "M-r");
   grab_key(dpy, root, "M-1");
   grab_key(dpy, root, "M-2");
   grab_key(dpy, root, "M-3");
