@@ -16,6 +16,7 @@ A Window Manager.
 * **M-S-Mouse2** Bury the window under the pointer.
 * **M-Mouse3** Start resizing the window under the pointer.
 * **M-f** Make the window under the pointer fullscreen.
+* **M-m** Toggle decorations for the window under the pointer.
 
 ## Known Bugs
 

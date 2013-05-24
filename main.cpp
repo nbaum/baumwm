@@ -77,6 +77,7 @@ struct XClient
   std::string title;
   int x, y, width, height;
   XineramaScreenInfo *fullscreen;
+  bool undecorated;
   uint32_t desktop;
   XSizeHints hints;
   std::map<int, Geom> geom;
@@ -166,19 +167,21 @@ void XEventLoop ()
 void XDrawFrame (XClient& client, bool active)
 {
   unsigned int color;
+  int w = client.width + 8, h = client.height + 4 + HeadlineHeight;
+  if (client.fullscreen)
+    w = client.fullscreen->width, h = client.fullscreen->height;
   if (active)
     color = active_frame_pixel;
   else
     color = inactive_frame_pixel;
   XSetForeground(dpy, client.gc, color);
-  XFillRectangle(dpy, client.frame, client.gc, 0, 0,
-                 client.width + 8, client.height + HeadlineHeight + 4);
+  XFillRectangle(dpy, client.frame, client.gc, 0, 0, w, h);
   XSetForeground(dpy, client.gc, BlackPixel(dpy, 0));
-  XFillRectangle(dpy, client.frame, client.gc, 3, 3, client.width + 2, client.height + HeadlineHeight - 2);
-  XSetForeground(dpy, client.gc, color);
-  XFillRectangle(dpy, client.frame, client.gc, 4, 4, client.width, 15);
+  XDrawRectangle(dpy, client.frame, client.gc, 3, HeadlineHeight - 1, w - 7, h - HeadlineHeight - 3);
+  //XSetForeground(dpy, client.gc, color);
+  //XFillRectangle(dpy, client.frame, client.gc, 4, 4, client.width, 15);
   XSetForeground(dpy, client.gc, frame_text_pixel);
-  XDrawString(dpy, client.frame, client.gc, 8, 15, client.title.c_str(), client.title.length());
+  XDrawString(dpy, client.frame, client.gc, 4, 14, client.title.c_str(), client.title.length());
 }
 
 void update_name (XClient &client)
@@ -268,25 +271,47 @@ void move_resize (XClient& client, int x, int y, int width, int height)
     y = s->y_org;
     width = s->width;
     height = s->height;
-    XMoveResizeWindow(dpy, client.frame, x, y, width, height);
-    XSetWindowBorderWidth(dpy, client.frame, 0);
-    XMoveResizeWindow(dpy, client.child, 0, 0, width, height);
-    XConfigureEvent ev = {
-      .type = ConfigureNotify,
-      .event = client.child,
-      .window = client.child,
-      .x = x,
-      .y = y,
-      .width = width,
-      .height = height
-    };
-    XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
+    if (client.undecorated) {
+      XMoveResizeWindow(dpy, client.frame, x, y, width, height);
+      XSetWindowBorderWidth(dpy, client.frame, 0);
+      XMoveResizeWindow(dpy, client.child, 0, 0, width, height);
+      XConfigureEvent ev = {
+        .type = ConfigureNotify,
+        .event = client.child,
+        .window = client.child,
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height
+      };
+      XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
+    } else {
+      XMoveResizeWindow(dpy, client.frame, x, y, width, height);
+      XSetWindowBorderWidth(dpy, client.frame, 0);
+      XMoveResizeWindow(dpy, client.child, 4, HeadlineHeight, width - 8, height - HeadlineHeight - 4);
+      XConfigureEvent ev = {
+        .type = ConfigureNotify,
+        .event = client.child,
+        .window = client.child,
+        .x = x + 4,
+        .y = y + HeadlineHeight,
+        .width = width - 8,
+        .height = height - HeadlineHeight - 4
+      };
+      XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
+    }
   } else {
     width = std::min(std::max(std::max(15, client.hints.min_width), width), client.hints.max_width);
     height = std::min(std::max(std::max(15, client.hints.min_height), height), client.hints.max_width);
-    XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
-    XSetWindowBorderWidth(dpy, client.frame, 1);
-    XMoveResizeWindow(dpy, client.child, 4, HeadlineHeight, width, height);
+    if (client.undecorated) {
+      XMoveResizeWindow(dpy, client.frame, x, y, width, height);
+      XSetWindowBorderWidth(dpy, client.frame, 0);
+      XMoveResizeWindow(dpy, client.child, 0, 0, width, height);
+    } else {
+      XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
+      XSetWindowBorderWidth(dpy, client.frame, 1);
+      XMoveResizeWindow(dpy, client.child, 4, HeadlineHeight, width, height);
+    }
     XConfigureEvent ev = {
       .type = ConfigureNotify,
       .event = client.child,
@@ -525,14 +550,23 @@ void key_press (XKeyPressedEvent& event)
     exit(0);
     execlp(command, command, 0);
   } else if (match_key(event, "M-f")) {
+    client.undecorated = false;
     current_screen();
     if (client.fullscreen) {
       client.fullscreen = 0;
     } else {
       auto s = find_screen(event.x_root, event.y_root);
       if (s) client.fullscreen = s;
+      client.undecorated = true;
     }
     move_resize(client, client.x, client.y, client.width, client.height);
+  } else if (match_key(event, "M-m")) {
+    client.undecorated = !client.undecorated;
+    if (client.undecorated) {
+      move_resize(client, client.x + 5, client.y + HeadlineHeight + 1, client.width, client.height);
+    } else {
+      move_resize(client, client.x - 5, client.y - HeadlineHeight - 1, client.width, client.height);
+    }
   }
 }
 
@@ -587,6 +621,7 @@ int main (int argc, const char *argv[])
   grab_key(dpy, root, "M-c");
   grab_key(dpy, root, "M-q");
   grab_key(dpy, root, "M-f");
+  grab_key(dpy, root, "M-m");
   grab_key(dpy, root, "M-1");
   grab_key(dpy, root, "M-2");
   grab_key(dpy, root, "M-3");
