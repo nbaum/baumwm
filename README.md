@@ -15,3 +15,12 @@ A Window Manager.
 * **M-Mouse2** Raise the window under the pointer.
 * **M-S-Mouse2** Bury the window under the pointer.
 * **M-Mouse3** Start resizing the window under the pointer.
+* **M-f** Make the window under the pointer fullscreen.
+
+## Known Bugs
+
+* Size increment hints are ignored.
+* Most of ICCM is unimplemented.
+* Most of EWHM is unimplemented.
+* Pointing at root and using window-related keychords crashes Admiral.
+

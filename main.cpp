@@ -3,6 +3,8 @@
 #include <X11/Xutil.h>
 #include <X11/cursorfont.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <iostream>
@@ -11,6 +13,8 @@
 #include <err.h>
 
 #include "util.h"
+
+int pid_bar = 0;
 
 int screen_count;
 XineramaScreenInfo *screens;
@@ -33,11 +37,11 @@ const int HeadlineHeight = 20;
 
 int ModMask = Mod4Mask;
 
-void spawn (const char *command) {
-  if (!fork()) {
-    execlp("/bin/sh", "/bin/sh", "-c", command, NULL);
-    exit(1);
-  }
+int spawn (const char *command) {
+  int pid = fork();
+  if (pid) return pid;
+  execlp("/bin/sh", "/bin/sh", "-c", command, NULL);
+  exit(1);
 }
 
 XWindowAttributes attr;
@@ -51,6 +55,16 @@ unsigned int active_frame_pixel;
 unsigned int frame_text_pixel;
 unsigned int inactive_frame_pixel;
 
+XineramaScreenInfo *current_screen ()
+{
+  int x, y;
+  Window a, b;
+  int c, d;
+  unsigned int e;
+  XQueryPointer(dpy, root, &a, &b, &x, &y, &c, &d, &e);
+  return find_screen(x, y);
+}
+
 struct Geom : XRectangle
 {
   bool fullscreen;
@@ -62,6 +76,7 @@ struct XClient
   GC gc;
   std::string title;
   int x, y, width, height;
+  XineramaScreenInfo *fullscreen;
   uint32_t desktop;
   XSizeHints hints;
   std::map<int, Geom> geom;
@@ -95,9 +110,6 @@ void ProcessHints (XClient& client)
   if ((client.hints.flags & PResizeInc) == 0)
     client.hints.width_inc = client.hints.height_inc = 1;
   auto &h = client.hints;
-  //printf("min: %ix%i\n", h.min_width, h.min_height);
-  //printf("base: %ix%i\n", h.base_width, h.base_height);
-  //printf("size: %ix%i\n", h.width, h.height);
 }
 
 XClient& XFindClient (Window w, bool create)
@@ -108,6 +120,15 @@ XClient& XFindClient (Window w, bool create)
     auto frame = XCreateWindow(dpy, root, 0, 0, 1, 1, 1, CopyFromParent,
                                InputOutput, CopyFromParent, 0, 0);
     c = new XClient { .frame = frame, .child = w, .desktop = current_desktop };
+    c->width = 500;
+    c->height = 300;
+    auto s = current_screen();
+    if (s) {
+      c->width = s->width / 3;
+      c->height = s->height / 3;
+      c->x = s->width / 2 + s->x_org - c->width / 2;
+      c->y = s->height / 2 + s->y_org - c->height / 2;
+    }
     XSetWindowBorder(dpy, frame, BlackPixel(dpy, 0));
     XAddToSaveSet(dpy, w);
     XReparentWindow(dpy, w, frame, 4, HeadlineHeight);
@@ -136,7 +157,7 @@ void XEventLoop ()
   for (;;) {
     XEvent event;
     XNextEvent(dpy, &event);
-    printf("Event: %s\n", XEventName(event.type));
+    //printf("Event: %s\n", XEventName(event.type));
     if (auto fn = event_handlers[event.type])
       fn(event);
   }
@@ -242,27 +263,45 @@ void button_press (XButtonPressedEvent& event)
 
 void move_resize (XClient& client, int x, int y, int width, int height)
 {
-  //printf("%ix%i+%i+%i\n", width, height, x, y);
-  width = std::min(std::max(std::max(15, client.hints.min_width), width), client.hints.max_width);
-  height = std::min(std::max(std::max(15, client.hints.min_height), height), client.hints.max_width);
-  width = width - (width - client.hints.base_width) % client.hints.width_inc;
-  height = height - (height - client.hints.base_height) % client.hints.height_inc;
-  XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
-  XResizeWindow(dpy, client.child, width, height);
-  XConfigureEvent ev = {
-    .type = ConfigureNotify,
-    .event = client.child,
-    .window = client.child,
-    .x = x + 4,
-    .y = y + HeadlineHeight,
-    .width = width,
-    .height = height
-  };
-  XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
-  client.x = x;
-  client.y = y;
-  client.width = width;
-  client.height = height;
+  if (auto s = client.fullscreen) {
+    x = s->x_org;
+    y = s->y_org;
+    width = s->width;
+    height = s->height;
+    XMoveResizeWindow(dpy, client.frame, x, y, width, height);
+    XSetWindowBorderWidth(dpy, client.frame, 0);
+    XMoveResizeWindow(dpy, client.child, 0, 0, width, height);
+    XConfigureEvent ev = {
+      .type = ConfigureNotify,
+      .event = client.child,
+      .window = client.child,
+      .x = x,
+      .y = y,
+      .width = width,
+      .height = height
+    };
+    XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
+  } else {
+    width = std::min(std::max(std::max(15, client.hints.min_width), width), client.hints.max_width);
+    height = std::min(std::max(std::max(15, client.hints.min_height), height), client.hints.max_width);
+    XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
+    XSetWindowBorderWidth(dpy, client.frame, 1);
+    XMoveResizeWindow(dpy, client.child, 4, HeadlineHeight, width, height);
+    XConfigureEvent ev = {
+      .type = ConfigureNotify,
+      .event = client.child,
+      .window = client.child,
+      .x = x + 4,
+      .y = y + HeadlineHeight,
+      .width = width,
+      .height = height
+    };
+    XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
+    client.x = x;
+    client.y = y;
+    client.width = width;
+    client.height = height;
+  }
 }
 
 void motion (XMotionEvent& event)
@@ -299,18 +338,13 @@ void button_release (XButtonReleasedEvent& event)
 void configure (XConfigureRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
-  printf("client wants to be ");
-  if (event.value_mask & CWWidth)
-    printf("%i", event.width);
-  if (event.value_mask & CWHeight)
-    printf("x%i", event.height);
-  if (event.value_mask & (CWX | CWY))
-    printf("+");
-  if (event.value_mask & CWX)
-    printf("%i", event.x);
-  if (event.value_mask & CWY)
-    printf("+%i", event.y);
+
+  if (event.value_mask & CWWidth) printf("%i", event.width);
+  if (event.value_mask & CWHeight) printf("x%i", event.height);
+  if (event.value_mask & CWX) printf("+%i", event.x);
+  if (event.value_mask & CWY) printf("+%i", event.y);
   printf("\n");
+
   if (event.value_mask & CWX) client.x = event.x;
   if (event.value_mask & CWY) client.y = event.y;
   if (event.value_mask & CWWidth) client.width = event.width;
@@ -364,13 +398,11 @@ Atom XA_NET_WM_STATE;
 
 void message (XClientMessageEvent& event)
 {
-  if (event.message_type == XA_NET_WM_STATE) {
-    for (int i = 0; i < 5; ++i)
-      if (event.data.l[i])
-        ;
-        //std::cerr << XGetAtomName(dpy, event.data.l[i]) << std::endl;
+  if (event.message_type == XInternAtom(dpy, "_NET_WM_STATE", True)) {
+    
+    //printf("%i %s\n", event.data.l[0], XGetAtomName(dpy, event.data.l[1]));
   } else {
-    //std::cerr << XGetAtomName(dpy, event.message_type) << std::endl;
+    //printf("%s\n", XGetAtomName(dpy, event.message_type));
   }
 }
 
@@ -381,18 +413,10 @@ void expose (XExposeEvent& event)
     XDrawFrame(client, &client == focused);
 }
 
-void property (XPropertyEvent& event)
-{
-  auto &client = XFindClient(event.window, False);
-  //std::cout << XGetAtomName(dpy, event.atom) << std::endl;
-  if (!&client) return;
-  update_name(client);
-}
 
 template<typename T, typename T2>
 void setprop (Window w, const char *name, const T2 &value)
 {
-  printf("Setting %s to %i\n", name, value);
   auto atom = XInternAtom(dpy, name, True);
   T temp = value;
   XChangeProperty(dpy, w, atom, atom, 8, PropModeReplace, (unsigned char *) &temp, sizeof(temp));
@@ -415,9 +439,16 @@ T getprop (Window w, const char *name, const T2 def)
   return val;
 }
 
+void property (XPropertyEvent& event)
+{
+  auto &client = XFindClient(event.window, False);
+  auto prop = XGetAtomName(dpy, event.atom);
+  if (!&client) return;
+  update_name(client);
+}
+
 void set_desktop (uint32_t num)
 {
-  printf("dmask %i -> %i\n", current_desktop, num);
   current_desktop = num;
   for (auto i = clients.begin(); i != clients.end(); ++i) {
     auto &client = *i->second;
@@ -490,10 +521,18 @@ void key_press (XKeyPressedEvent& event)
   } else if (match_key(event, "M-c")) {
     XDestroyClient(client.child);
   } else if (match_key(event, "M-q")) {
+    if (pid_bar) kill(pid_bar, 15);
     exit(0);
     execlp(command, command, 0);
   } else if (match_key(event, "M-f")) {
-    find_screen(event.x_root, event.y_root);
+    current_screen();
+    if (client.fullscreen) {
+      client.fullscreen = 0;
+    } else {
+      auto s = find_screen(event.x_root, event.y_root);
+      if (s) client.fullscreen = s;
+    }
+    move_resize(client, client.x, client.y, client.width, client.height);
   }
 }
 
@@ -511,7 +550,7 @@ int main (int argc, const char *argv[])
   if (!(dpy = XOpenDisplay(0)))
     err(1, "failed to start");
   screens = XineramaQueryScreens(dpy, &screen_count);
-  spawn("xmobar -b");
+  pid_bar = spawn("xmobar -b");
   XSynchronize(dpy, True);
   current_desktop = 1;
   active_frame_pixel   = XMakeColor(dpy, "rgb:f/0/0");
@@ -535,7 +574,7 @@ int main (int argc, const char *argv[])
       XMapWindow(dpy, client.child);
       XMapWindow(dpy, client.frame);
       set_desktop(client, num > -1 ? num : client.desktop);
-      printf("Window %s is on %li\n", client.title.c_str(), num);
+      //printf("Window %s is on %li\n", client.title.c_str(), num);
       XClearWindow(dpy, client.frame);
       XSetWMState(client, 1);
     }
@@ -585,3 +624,4 @@ int main (int argc, const char *argv[])
   XEventLoop();
   return 0;
 }
+
