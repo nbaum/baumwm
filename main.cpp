@@ -113,6 +113,14 @@ void ProcessHints (XClient& client)
   auto &h = client.hints;
 }
 
+void XDrawFrame (XClient& client, bool active);
+
+void unfocus (XClient& client)
+{
+  XGrabButton(dpy, 1, AnyModifier, client.frame, False, ButtonPressMask | ButtonReleaseMask, GrabModeSync, GrabModeSync, None, None);
+  XDrawFrame(client, false);
+}
+
 XClient& XFindClient (Window w, bool create)
 {
   auto c = clients[w];
@@ -141,6 +149,7 @@ XClient& XFindClient (Window w, bool create)
     XSelectInput(dpy, w, PropertyChangeMask | StructureNotifyMask);
     ProcessHints(*c);
     clients[frame] = clients[w] = c;
+    unfocus(*c);
   }
   return *c;
 }
@@ -158,7 +167,7 @@ void XEventLoop ()
   for (;;) {
     XEvent event;
     XNextEvent(dpy, &event);
-    //printf("Event: %s\n", XEventName(event.type));
+    printf("Event: %s\n", XEventName(event.type));
     if (auto fn = event_handlers[event.type])
       fn(event);
   }
@@ -199,68 +208,83 @@ void update_name (XClient &client)
 
 void focus (XClient& client, Window window = None)
 {
-  if (focused) {
-    XDrawFrame(*focused, false);
-  }
+  if (focused)
+    unfocus(*focused);
   if (&client) {
     XWindowAttributes attr;
     XGetWindowAttributes(dpy, client.frame, &attr);
     if (attr.map_state != IsViewable) return;
+    XUngrabButton(dpy, 1, AnyModifier, client.frame);
     XSetInputFocus(dpy, client.child, RevertToPointerRoot, CurrentTime);
+    XRaiseWindow(dpy, client.frame);
+    focused = &client;
     XDrawFrame(client, true);
   } else if (window) {
     XSetInputFocus(dpy, window, RevertToPointerRoot, CurrentTime);
+    focused = 0;
   }
-  focused = &client;
 }
 
 void button_press (XButtonPressedEvent& event)
 {
+  /*printf("send_event=%i\n", event.send_event);
+  printf("window=0x%08x\n", event.window);
+  printf("root=0x%08x\n", event.root);
+  printf("subwindow=0x%08x\n", event.subwindow);
+  printf("pos=%i,%i (%i,%i)\n", event.x, event.y, event.x_root, event.y_root);
+  printf("state=%i\n", event.state);
+  printf("button=%i\n", event.button);
+  printf("\n");*/
   Window win = event.subwindow ? event.subwindow : event.window;
   auto &client = XFindClient(win, False);
-  if (event.button == 1) {
-    XGetWindowAttributes(dpy, win, &attr);
-    if (&client) {
-      attr.x = client.x;
-      attr.y = client.y;
-      attr.width = client.width;
-      attr.height = client.height;
-    }
-    XGrabPointer(dpy, win, True,
-                ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-                GrabModeAsync, root, XCreateFontCursor(dpy, XC_fleur),
-                event.time);
-    start = event;
-  } else if (event.button == 2) {
-    if (event.state & ShiftMask) {
-      XLowerWindow(dpy, win);
-    } else {
-      XRaiseWindow(dpy, win);
-    }
+  if (event.window != root) {
+    focus(client, event.window);
+    XAllowEvents(dpy, ReplayPointer, CurrentTime);
   } else {
-    XGetWindowAttributes(dpy, win, &attr);
-    if (&client) {
-      attr.x = client.x;
-      attr.y = client.y;
-      attr.width = client.width;
-      attr.height = client.height;
+    if (event.button == 1) {
+      XGetWindowAttributes(dpy, win, &attr);
+      if (&client) {
+        attr.x = client.x;
+        attr.y = client.y;
+        attr.width = client.width;
+        attr.height = client.height;
+      }
+      XGrabPointer(dpy, win, True,
+                  ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+                  GrabModeAsync, root, XCreateFontCursor(dpy, XC_fleur),
+                  event.time);
+      start = event;
+    } else if (event.button == 2) {
+      if (event.state & ShiftMask) {
+        XLowerWindow(dpy, win);
+      } else {
+        XRaiseWindow(dpy, win);
+      }
+    } else {
+      XGetWindowAttributes(dpy, win, &attr);
+      if (&client) {
+        attr.x = client.x;
+        attr.y = client.y;
+        attr.width = client.width;
+        attr.height = client.height;
+      }
+      start = event;
+      hf = std::max(-1, std::min(1, 3 * (start.x - attr.x) / attr.width - 1));
+      vf = std::max(-1, std::min(1, 3 * (start.y - attr.y) / attr.height - 1));
+      int cursors[] = {XC_top_left_corner, XC_top_side, XC_top_right_corner, XC_left_side, XC_circle, XC_right_side, XC_bottom_left_corner, XC_bottom_side, XC_bottom_right_corner};
+      int cursor = cursors[4 + hf + 3 * vf];
+      start.x = start.x_root;
+      start.y = start.y_root;
+      /*if (hf < 0)  start.x_root = attr.x;
+      if (hf > 0)  start.x_root = attr.x + attr.width;
+      if (vf < 0)  start.y_root = attr.y;
+      if (vf > 0)  start.y_root = attr.y + attr.height;
+      XWarpPointer(dpy, None, root, 0, 0, 0, 0, start.x_root, start.y_root);*/
+      XGrabPointer(dpy, win, True,
+                  ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+                  GrabModeAsync, root, XCreateFontCursor(dpy, cursor),
+                  event.time);
     }
-    start = event;
-    hf = std::max(-1, std::min(1, 3 * (start.x - attr.x) / attr.width - 1));
-    vf = std::max(-1, std::min(1, 3 * (start.y - attr.y) / attr.height - 1));
-    int cursors[] = {XC_top_left_corner, XC_top_side, XC_top_right_corner, XC_left_side, XC_circle, XC_right_side, XC_bottom_left_corner, XC_bottom_side, XC_bottom_right_corner};
-    int cursor = cursors[4 + hf + 3 * vf];
-    start.x = start.x_root;
-    start.y = start.y_root;
-    /*if (hf < 0)  start.x_root = attr.x;
-    if (hf > 0)  start.x_root = attr.x + attr.width;
-    if (vf < 0)  start.y_root = attr.y;
-    if (vf > 0)  start.y_root = attr.y + attr.height;
-    XWarpPointer(dpy, None, root, 0, 0, 0, 0, start.x_root, start.y_root);*/
-    XGrabPointer(dpy, win, True,
-                ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-                GrabModeAsync, root, XCreateFontCursor(dpy, cursor),
-                event.time);
   }
 }
 
@@ -363,13 +387,11 @@ void button_release (XButtonReleasedEvent& event)
 void configure (XConfigureRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
-
-  if (event.value_mask & CWWidth) printf("%i", event.width);
-  if (event.value_mask & CWHeight) printf("x%i", event.height);
-  if (event.value_mask & CWX) printf("+%i", event.x);
-  if (event.value_mask & CWY) printf("+%i", event.y);
-  printf("\n");
-
+  //if (event.value_mask & CWWidth) printf("%i", event.width);
+  //if (event.value_mask & CWHeight) printf("x%i", event.height);
+  //if (event.value_mask & CWX) printf("+%i", event.x);
+  //if (event.value_mask & CWY) printf("+%i", event.y);
+  //printf("\n");
   if (event.value_mask & CWX) client.x = event.x;
   if (event.value_mask & CWY) client.y = event.y;
   if (event.value_mask & CWWidth) client.width = event.width;
@@ -416,19 +438,11 @@ void unmap (XUnmapEvent& event)
 void enter (XEnterWindowEvent& event)
 {
   auto &client = XFindClient(event.window, false);
-  focus(client, event.window);
+  //focus(client, event.window);
 }
-
-Atom XA_NET_WM_STATE;
 
 void message (XClientMessageEvent& event)
 {
-  if (event.message_type == XInternAtom(dpy, "_NET_WM_STATE", True)) {
-    
-    //printf("%i %s\n", event.data.l[0], XGetAtomName(dpy, event.data.l[1]));
-  } else {
-    //printf("%s\n", XGetAtomName(dpy, event.message_type));
-  }
 }
 
 void expose (XExposeEvent& event)
@@ -586,13 +600,11 @@ int main (int argc, const char *argv[])
   if (!(dpy = XOpenDisplay(0)))
     err(1, "failed to start");
   screens = XineramaQueryScreens(dpy, &screen_count);
-  pid_bar = spawn("xmobar -b");
   XSynchronize(dpy, True);
   current_desktop = 1;
   active_frame_pixel   = XMakeColor(dpy, "rgb:f/0/0");
   frame_text_pixel     = XMakeColor(dpy, "rgb:f/f/f");
   inactive_frame_pixel = XMakeColor(dpy, "rgb:8/8/8");
-  XA_NET_WM_STATE = XInternAtom(dpy, "_NET_WM_STATE", False);
   root = DefaultRootWindow(dpy);
   XSetErrorHandler(error);
   Window *children, parent;
@@ -610,12 +622,12 @@ int main (int argc, const char *argv[])
       XMapWindow(dpy, client.child);
       XMapWindow(dpy, client.frame);
       set_desktop(client, num > -1 ? num : client.desktop);
-      //printf("Window %s is on %li\n", client.title.c_str(), num);
       XClearWindow(dpy, client.frame);
       XSetWMState(client, 1);
+      update_name(client);
     }
   }
-  XSelectInput(dpy, root, KeyPressMask | SubstructureRedirectMask);
+  XSelectInput(dpy, root, FocusChangeMask | ButtonPressMask | KeyPressMask | SubstructureRedirectMask);
   XDefineCursor(dpy, root, XCreateFontCursor(dpy, XC_left_ptr));
   XSetWindowBackground(dpy, root, XMakeColor(dpy, "rgb:4/6/8"));
   XClearWindow(dpy, root);
