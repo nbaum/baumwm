@@ -1,7 +1,22 @@
-#ifndef util_h
-#define util_h
 
-extern int ModMask;
+const char *getenv (const char *name, const char *def)
+{
+  const char *env = getenv(name);
+  return env ? env : def;
+}
+
+const char *XGetDefault (Display *dpy, const char *program, const char *option, const char *def)
+{
+  auto s = XGetDefault(dpy, program, option);
+  return s ? s : def;
+}
+
+int spawn (const char *command) {
+  int pid = fork();
+  if (pid) return pid;
+  execlp("/bin/sh", "/bin/sh", "-c", command, NULL);
+  exit(1);
+}
 
 inline unsigned long XMakeColor (Display *dpy, const char *s)
 {
@@ -107,4 +122,3 @@ inline const char *XEventName (int type)
   return event_names[type];
 }
 
-#endif

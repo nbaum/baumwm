@@ -1,0 +1,5 @@
+#! /bin/sh
+
+COMMAND=$(compgen -c | sort | dmenu -b -p run:)
+exec $COMMAND
+
