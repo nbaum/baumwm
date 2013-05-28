@@ -82,13 +82,9 @@ XClient& XFindClient (Window w, bool create)
     c = new XClient { .frame = frame, .child = w, .desktop = current_desktop };
     c->width = 500;
     c->height = 300;
-    auto s = current_screen();
-    if (s) {
-      c->width = s->width / 3;
-      c->height = s->height / 3;
-      c->x = s->width / 2 + s->x_org - c->width / 2;
-      c->y = s->height / 2 + s->y_org - c->height / 2;
-    }
+    auto p = pointer();
+    c->x = p.x - c->width / 2;
+    c->y = p.y - c->height / 2;
     XSetWindowBorder(dpy, frame, BlackPixel(dpy, 0));
     XAddToSaveSet(dpy, w);
     XReparentWindow(dpy, w, frame, 4, HeadlineHeight);
