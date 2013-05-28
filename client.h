@@ -69,7 +69,6 @@ void ProcessHints (XClient& client)
 
 void unfocus (XClient& client)
 {
-  XGrabButton(dpy, 1, AnyModifier, client.frame, False, ButtonPressMask | ButtonReleaseMask, GrabModeSync, GrabModeSync, None, None);
   XDrawFrame(client, false);
 }
 
@@ -129,7 +128,6 @@ void focus (XClient& client, Window window = None)
     if (attr.map_state != IsViewable) return;
     XUngrabButton(dpy, 1, AnyModifier, client.frame);
     XSetInputFocus(dpy, client.child, RevertToPointerRoot, CurrentTime);
-    XRaiseWindow(dpy, client.frame);
     focused = &client;
     XDrawFrame(client, true);
   } else if (window) {

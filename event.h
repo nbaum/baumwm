@@ -21,49 +21,44 @@ void button_press (XButtonPressedEvent& event)
 {
   Window win = event.subwindow ? event.subwindow : event.window;
   auto &client = XFindClient(win, False);
-  if (event.window != root) {
-    focus(client, event.window);
-    XAllowEvents(dpy, ReplayPointer, CurrentTime);
-  } else {
-    if (event.button == 1) {
-      XGetWindowAttributes(dpy, win, &attr);
-      if (&client) {
-        attr.x = client.x;
-        attr.y = client.y;
-        attr.width = client.width;
-        attr.height = client.height;
-      }
-      XGrabPointer(dpy, win, True,
-                  ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-                  GrabModeAsync, root, XCreateFontCursor(dpy, XC_fleur),
-                  event.time);
-      start = event;
-    } else if (event.button == 2) {
-      if (event.state & ShiftMask) {
-        XLowerWindow(dpy, win);
-      } else {
-        XRaiseWindow(dpy, win);
-      }
-    } else {
-      XGetWindowAttributes(dpy, win, &attr);
-      if (&client) {
-        attr.x = client.x;
-        attr.y = client.y;
-        attr.width = client.width;
-        attr.height = client.height;
-      }
-      start = event;
-      hf = std::max(-1, std::min(1, 3 * (start.x - attr.x) / attr.width - 1));
-      vf = std::max(-1, std::min(1, 3 * (start.y - attr.y) / attr.height - 1));
-      int cursors[] = {XC_top_left_corner, XC_top_side, XC_top_right_corner, XC_left_side, XC_circle, XC_right_side, XC_bottom_left_corner, XC_bottom_side, XC_bottom_right_corner};
-      int cursor = cursors[4 + hf + 3 * vf];
-      start.x = start.x_root;
-      start.y = start.y_root;
-      XGrabPointer(dpy, win, True,
-                  ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
-                  GrabModeAsync, root, XCreateFontCursor(dpy, cursor),
-                  event.time);
+  if (event.button == 1) {
+    XGetWindowAttributes(dpy, win, &attr);
+    if (&client) {
+      attr.x = client.x;
+      attr.y = client.y;
+      attr.width = client.width;
+      attr.height = client.height;
     }
+    XGrabPointer(dpy, win, True,
+                ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+                GrabModeAsync, root, XCreateFontCursor(dpy, XC_fleur),
+                event.time);
+    start = event;
+  } else if (event.button == 2) {
+    if (event.state & ShiftMask) {
+      XLowerWindow(dpy, win);
+    } else {
+      XRaiseWindow(dpy, win);
+    }
+  } else {
+    XGetWindowAttributes(dpy, win, &attr);
+    if (&client) {
+      attr.x = client.x;
+      attr.y = client.y;
+      attr.width = client.width;
+      attr.height = client.height;
+    }
+    start = event;
+    hf = std::max(-1, std::min(1, 3 * (start.x - attr.x) / attr.width - 1));
+    vf = std::max(-1, std::min(1, 3 * (start.y - attr.y) / attr.height - 1));
+    int cursors[] = {XC_top_left_corner, XC_top_side, XC_top_right_corner, XC_left_side, XC_circle, XC_right_side, XC_bottom_left_corner, XC_bottom_side, XC_bottom_right_corner};
+    int cursor = cursors[4 + hf + 3 * vf];
+    start.x = start.x_root;
+    start.y = start.y_root;
+    XGrabPointer(dpy, win, True,
+                ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
+                GrabModeAsync, root, XCreateFontCursor(dpy, cursor),
+                event.time);
   }
 }
 
@@ -145,7 +140,7 @@ void unmap (XUnmapEvent& event)
 void enter (XEnterWindowEvent& event)
 {
   auto &client = XFindClient(event.window, false);
-  //focus(client, event.window);
+  focus(client, event.window);
 }
 
 void message (XClientMessageEvent& event)
