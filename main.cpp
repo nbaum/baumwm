@@ -34,6 +34,7 @@ int main (int argc, const char *argv[])
   root = DefaultRootWindow(dpy);
   Window *children, parent;
   unsigned int nchildren;
+  current_desktop = getprop<long>(root, "_NET_CURRENT_DESKTOP", 0);
   XQueryTree(dpy, root, &root, &parent, &children, &nchildren);
   for (int j = 0; j < nchildren; j++) {
     XWindowAttributes attr;
