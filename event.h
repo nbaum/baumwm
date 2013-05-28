@@ -96,13 +96,16 @@ void button_release (XButtonReleasedEvent& event)
 void configure (XConfigureRequestEvent& event)
 {
   auto &client = XFindClient(event.window, True);
-  //if (event.value_mask & CWWidth) printf("%i", event.width);
-  //if (event.value_mask & CWHeight) printf("x%i", event.height);
-  //if (event.value_mask & CWX) printf("+%i", event.x);
-  //if (event.value_mask & CWY) printf("+%i", event.y);
-  //printf("\n");
   if (event.value_mask & CWX) client.x = event.x;
   if (event.value_mask & CWY) client.y = event.y;
+  if (event.value_mask & CWX && event.value_mask & CWY) {
+    auto s = find_screen(client.x, client.y);
+    client.x -= s->x_org;
+    client.y -= s->y_org;
+    s = current_screen();
+    client.x += s->x_org;
+    client.y += s->y_org;
+  }
   if (event.value_mask & CWWidth) client.width = event.width;
   if (event.value_mask & CWHeight) client.height = event.height;
   move_resize(client, client.x, client.y, client.width, client.height);
