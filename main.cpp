@@ -62,6 +62,8 @@ int main (int argc, const char *argv[])
   grab_key(dpy, root, "M-f");
   grab_key(dpy, root, "M-m");
   grab_key(dpy, root, "M-r");
+  grab_key(dpy, root, "M-Prior");
+  grab_key(dpy, root, "M-Next");
   grab_key(dpy, root, "M-1");
   grab_key(dpy, root, "M-2");
   grab_key(dpy, root, "M-3");

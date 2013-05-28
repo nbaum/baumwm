@@ -231,6 +231,10 @@ void key_press (XKeyPressedEvent& event)
     }
   } else if (match_key(event, "M-r")) {
     spawn("/home/nathan/admiral/libexec/run");
+  } else if (match_key(event, "M-Prior")) {
+    XLowerWindow(dpy, event.subwindow);
+  } else if (match_key(event, "M-Next")) {
+    XRaiseWindow(dpy, event.subwindow);
   }
 }
 
