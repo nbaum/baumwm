@@ -72,6 +72,8 @@ void unfocus (XClient& client)
   XDrawFrame(client, false);
 }
 
+void set_desktop (XClient& client, uint32_t num);
+
 XClient& XFindClient (Window w, bool create)
 {
   auto c = clients[w];
@@ -79,9 +81,10 @@ XClient& XFindClient (Window w, bool create)
     XWindowAttributes attr;
     auto frame = XCreateWindow(dpy, root, 0, 0, 1, 1, 1, CopyFromParent,
                                InputOutput, CopyFromParent, 0, 0);
-    c = new XClient { .frame = frame, .child = w, .desktop = current_desktop };
-    c->width = 500;
-    c->height = 300;
+    c = new XClient { .frame = frame, .child = w, .desktop = getprop<unsigned int>(w, "_NET_WM_DESKTOP", current_desktop) };
+    auto s = current_screen();
+    c->width = s->width / 3;
+    c->height = s->height / 3;
     auto p = pointer();
     c->x = p.x - c->width / 2;
     c->y = p.y - c->height / 2;
@@ -97,6 +100,7 @@ XClient& XFindClient (Window w, bool create)
     ProcessHints(*c);
     clients[frame] = clients[w] = c;
     unfocus(*c);
+    set_desktop(*c, c->desktop);
   }
   return *c;
 }
