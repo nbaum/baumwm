@@ -38,13 +38,22 @@ XineramaScreenInfo *find_screen (int x, int y)
   return 0;
 }
 
-XineramaScreenInfo *current_screen ()
+XPoint pointer ()
 {
   int x, y;
   Window a, b;
   int c, d;
   unsigned int e;
   XQueryPointer(dpy, root, &a, &b, &x, &y, &c, &d, &e);
-  return find_screen(x, y);
+  return XPoint{(short)x, (short)y};
 }
 
+XineramaScreenInfo *current_screen ()
+{
+  int x, y;
+  Window a, b;
+  int c, d;
+  unsigned int e;
+  XPoint p = pointer();
+  return find_screen(p.x, p.y);
+}
