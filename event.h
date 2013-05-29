@@ -40,7 +40,7 @@ void button_press (XButtonPressedEvent& event)
     } else {
       XRaiseWindow(dpy, win);
     }
-  } else {
+  } else if (event.button == 3) {
     XGetWindowAttributes(dpy, win, &attr);
     if (&client) {
       attr.x = client.x;
@@ -59,6 +59,12 @@ void button_press (XButtonPressedEvent& event)
                 ButtonReleaseMask | PointerMotionMask, GrabModeAsync,
                 GrabModeAsync, root, XCreateFontCursor(dpy, cursor),
                 event.time);
+  } else if (event.button == 4) {
+    if (&client)
+      XLowerWindow(dpy, client.frame);
+  } else if (event.button == 5) {
+    if (&client)
+      XRaiseWindow(dpy, client.frame);
   }
 }
 
@@ -261,12 +267,7 @@ void key_press (XKeyPressedEvent& event)
     }
     move_resize(client, client.x, client.y, client.width, client.height);
   } else if (match_key(event, "M-m")) {
-    client.undecorated = !client.undecorated;
-    if (client.undecorated) {
-      move_resize(client, client.x + 5, client.y + HeadlineHeight + 1, client.width, client.height);
-    } else {
-      move_resize(client, client.x - 5, client.y - HeadlineHeight - 1, client.width, client.height);
-    }
+    fill(client);
   } else if (match_key(event, "M-r")) {
     spawn("/home/nathan/admiral/libexec/run");
   } else if (match_key(event, "M-Prior")) {

@@ -105,6 +105,8 @@ int main (int argc, const char *argv[])
   grab_button(dpy, root, "M-2");
   grab_button(dpy, root, "M-S-2");
   grab_button(dpy, root, "M-3");
+  grab_button(dpy, root, "M-4");
+  grab_button(dpy, root, "M-5");
   XSetEventHandler(KeyPress, key_press);
   XSetEventHandler(Expose, expose);
   XSetEventHandler(ButtonPress, button_press);

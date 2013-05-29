@@ -1,3 +1,4 @@
+#include <sstream>
 
 struct Geom : XRectangle
 {
@@ -9,7 +10,10 @@ struct XClient
   Window frame, child;
   GC gc;
   std::string title;
-  int x, y, width, height;
+  union { int x, left; };
+  union { int y, top; };
+  int width, height;
+  int right, bottom;
   XineramaScreenInfo *fullscreen;
   bool undecorated;
   uint32_t desktop;
@@ -20,6 +24,8 @@ struct XClient
 std::map<Window, XClient *> clients;
 
 XClient *focused;
+
+XFontStruct *fs;
 
 void XDrawFrame (XClient& client, bool active)
 {
@@ -35,10 +41,30 @@ void XDrawFrame (XClient& client, bool active)
   XFillRectangle(dpy, client.frame, client.gc, 0, 0, w, h);
   XSetForeground(dpy, client.gc, BlackPixel(dpy, 0));
   XDrawRectangle(dpy, client.frame, client.gc, 3, HeadlineHeight - 1, w - 7, h - HeadlineHeight - 3);
-  //XSetForeground(dpy, client.gc, color);
-  //XFillRectangle(dpy, client.frame, client.gc, 4, 4, client.width, 15);
   XSetForeground(dpy, client.gc, frame_text_pixel);
   XDrawString(dpy, client.frame, client.gc, 4, 14, client.title.c_str(), client.title.length());
+  char buff[100] = "";
+  strcat(buff, "[");
+#define FOO(x) \
+  if (client.desktop & (1 << (x - 1))) { \
+    if (buff[1] != 0) \
+      strcat(buff, ", "); \
+    strcat(buff, # x); \
+    if (current_desktop & (1 << (x - 1)))\
+      strcat(buff, "*"); \
+  }
+  FOO(1);
+  FOO(2);
+  FOO(3);
+  FOO(4);
+  FOO(5);
+  FOO(6);
+  FOO(7);
+  FOO(8);
+  FOO(9);
+  strcat(buff, "]");
+  w = XTextWidth(fs, buff, strlen(buff));
+  XDrawString(dpy, client.frame, client.gc, client.width - w - 4, 14, buff, strlen(buff));
 }
 
 void XDestroyClient (Window w)
@@ -88,13 +114,16 @@ XClient& XFindClient (Window w, bool create)
     auto p = pointer();
     c->x = p.x - c->width / 2;
     c->y = p.y - c->height / 2;
+    c->right = c->x + c->width;
+    c->bottom = c->y + c->height;
     XSetWindowBorder(dpy, frame, BlackPixel(dpy, 0));
     XAddToSaveSet(dpy, w);
     XReparentWindow(dpy, w, frame, 4, HeadlineHeight);
     int num;
     Atom *atoms = XListProperties(dpy, w, &num);
     c->gc = XCreateGC(dpy, w, 0, 0);
-    XSetFont(dpy, c->gc, XLoadFont(dpy, "-*-profont-*-*-*-*-12-*-*-*-*-*-*-*"));
+    if (!fs) fs = XLoadQueryFont(dpy, "-*-profont-*-*-*-*-12-*-*-*-*-*-*-*");
+    XSetFont(dpy, c->gc, fs->fid);
     XSelectInput(dpy, frame, ButtonPressMask | ExposureMask | EnterWindowMask | SubstructureNotifyMask | SubstructureRedirectMask);
     XSelectInput(dpy, w, PropertyChangeMask | StructureNotifyMask);
     ProcessHints(*c);
@@ -198,6 +227,8 @@ void move_resize (XClient& client, int x, int y, int width, int height)
     client.y = y;
     client.width = width;
     client.height = height;
+    client.right = x + width + 10;
+    client.bottom = y + height + HeadlineHeight + 6;
   }
 }
 
@@ -209,3 +240,33 @@ void XSetWMState (XClient& client, int state)
                   PropModeReplace, (unsigned char *) data, 2);
 }
 
+bool overlap (int start1, int end1, int start2, int end2)
+{
+  if (start2 >= start1 && start2 <= end1) return true;
+  if (end2 >= start1 && end2 <= end1) return true;
+  if (start1 >= start2 && start1 <= end2) return true;
+  if (end1 >= start2 && end1 <= end2) return true;
+  return false;
+}
+
+void fill (XClient& client)
+{
+  int min_x = current_screen()->x_org;
+  int min_y = current_screen()->y_org;
+  int max_x = current_screen()->width + min_x;
+  int max_y = current_screen()->height + min_y;
+  for (auto i = clients.begin(); i != clients.end(); ++i) {
+    auto &c = *i->second;
+    if (&c == &client || (c.desktop & client.desktop) == 0)
+      continue;
+    if (overlap(c.left, c.right, client.left, client.right)) {
+      if (c.top > client.bottom) max_y = std::min(max_y, c.top);
+      if (c.bottom < client.top) min_y = std::max(min_y, c.bottom);
+    }
+    if (overlap(c.top, c.bottom, client.top, client.bottom)) {
+      if (c.left > client.right) max_x = std::min(max_x, c.left);
+      if (c.right < client.left) min_x = std::max(min_x, c.right);
+    }
+  }  
+  move_resize(client, min_x + 5, min_y + 5, max_x - min_x - 20, max_y - min_y - HeadlineHeight - 16);
+}
