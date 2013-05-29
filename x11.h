@@ -10,7 +10,7 @@ void setprop (Window w, const char *name, const T2 &value)
 template<typename T, typename T2>
 T getprop (Window w, const char *name, const T2 def)
 {
-  auto atom = XInternAtom(dpy, name, True);
+  auto atom = XInternAtom(dpy, name, False);
   T *prop, val;
   Atom type;
   int format;

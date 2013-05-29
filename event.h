@@ -64,6 +64,8 @@ void button_press (XButtonPressedEvent& event)
 
 void motion (XMotionEvent& event)
 {
+  while (XCheckTypedEvent(dpy, MotionNotify, (XEvent *) &event))
+    continue;
   auto &client = XFindClient(start.subwindow ? start.subwindow : start.window, False);
   if (!&client) return;
   if (start.button == 1) {
@@ -204,6 +206,42 @@ void key_press (XKeyPressedEvent& event)
     set_desktop(client, 128);
   } else if (match_key(event, "M-S-9")) {
     set_desktop(client, 256);
+  } else if (match_key(event, "M-C-1")) {
+    flip_desktop(1);
+  } else if (match_key(event, "M-C-2")) {
+    flip_desktop(2);
+  } else if (match_key(event, "M-C-3")) {
+    flip_desktop(4);
+  } else if (match_key(event, "M-C-4")) {
+    flip_desktop(8);
+  } else if (match_key(event, "M-C-5")) {
+    flip_desktop(16);
+  } else if (match_key(event, "M-C-6")) {
+    flip_desktop(32);
+  } else if (match_key(event, "M-C-7")) {
+    flip_desktop(64);
+  } else if (match_key(event, "M-C-8")) {
+    flip_desktop(128);
+  } else if (match_key(event, "M-C-9")) {
+    flip_desktop(256);
+  } else if (match_key(event, "M-C-S-1")) {
+    flip_desktop(client, 1);
+  } else if (match_key(event, "M-C-S-2")) {
+    flip_desktop(client, 2);
+  } else if (match_key(event, "M-C-S-3")) {
+    flip_desktop(client, 4);
+  } else if (match_key(event, "M-C-S-4")) {
+    flip_desktop(client, 8);
+  } else if (match_key(event, "M-C-S-5")) {
+    flip_desktop(client, 16);
+  } else if (match_key(event, "M-C-S-6")) {
+    flip_desktop(client, 32);
+  } else if (match_key(event, "M-C-S-7")) {
+    flip_desktop(client, 64);
+  } else if (match_key(event, "M-C-S-8")) {
+    flip_desktop(client, 128);
+  } else if (match_key(event, "M-C-S-9")) {
+    flip_desktop(client, 256);
   } else if (match_key(event, "M-Return")) {
     spawn(getenv("TERMINAL", "gnome-terminal"));
   } else if (match_key(event, "M-c")) {

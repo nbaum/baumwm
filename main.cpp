@@ -34,7 +34,7 @@ int main (int argc, const char *argv[])
   root = DefaultRootWindow(dpy);
   Window *children, parent;
   unsigned int nchildren;
-  current_desktop = getprop<long>(root, "_NET_CURRENT_DESKTOP", 0);
+  current_desktop = getprop<long>(root, "_NET_CURRENT_DESKTOP", -1);
   XQueryTree(dpy, root, &root, &parent, &children, &nchildren);
   for (int j = 0; j < nchildren; j++) {
     XWindowAttributes attr;
@@ -83,6 +83,24 @@ int main (int argc, const char *argv[])
   grab_key(dpy, root, "M-S-7");
   grab_key(dpy, root, "M-S-8");
   grab_key(dpy, root, "M-S-9");
+  grab_key(dpy, root, "M-C-1");
+  grab_key(dpy, root, "M-C-2");
+  grab_key(dpy, root, "M-C-3");
+  grab_key(dpy, root, "M-C-4");
+  grab_key(dpy, root, "M-C-5");
+  grab_key(dpy, root, "M-C-6");
+  grab_key(dpy, root, "M-C-7");
+  grab_key(dpy, root, "M-C-8");
+  grab_key(dpy, root, "M-C-9");
+  grab_key(dpy, root, "M-C-S-1");
+  grab_key(dpy, root, "M-C-S-2");
+  grab_key(dpy, root, "M-C-S-3");
+  grab_key(dpy, root, "M-C-S-4");
+  grab_key(dpy, root, "M-C-S-5");
+  grab_key(dpy, root, "M-C-S-6");
+  grab_key(dpy, root, "M-C-S-7");
+  grab_key(dpy, root, "M-C-S-8");
+  grab_key(dpy, root, "M-C-S-9");
   grab_button(dpy, root, "M-1");
   grab_button(dpy, root, "M-2");
   grab_button(dpy, root, "M-S-2");
