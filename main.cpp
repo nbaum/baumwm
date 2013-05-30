@@ -41,6 +41,7 @@ int main (int argc, const char *argv[])
     XGetWindowAttributes(dpy, children[j], &attr);
     if (!attr.override_redirect && attr.map_state == IsViewable) {
       auto &client = XFindClient(children[j], True);
+      client.mapped = true;
       update_name(client);
       move_resize(client, attr.x - 5, attr.y - HeadlineHeight - 1, attr.width, attr.height);
       auto num = getprop<long>(client.child, "_NET_WM_DESKTOP", -1);

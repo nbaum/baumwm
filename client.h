@@ -19,6 +19,7 @@ struct XClient
   uint32_t desktop;
   XSizeHints hints;
   std::map<int, Geom> geom;
+  bool mapped;
 };
 
 std::map<Window, XClient *> clients;
@@ -116,6 +117,7 @@ XClient& XFindClient (Window w, bool create)
     c->y = p.y - c->height / 2;
     c->right = c->x + c->width;
     c->bottom = c->y + c->height;
+    c->mapped = false;
     XSetWindowBorder(dpy, frame, BlackPixel(dpy, 0));
     XAddToSaveSet(dpy, w);
     XReparentWindow(dpy, w, frame, 4, HeadlineHeight);

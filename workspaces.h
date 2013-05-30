@@ -7,7 +7,7 @@ void set_desktop (uint32_t num)
   for (auto i = clients.begin(); i != clients.end(); ++i) {
     auto &client = *i->second;
     if (&client) {
-      if (client.desktop & num) {
+      if (client.desktop & num && client.mapped) {
         XMapWindow(dpy, client.frame);
       } else {
         XUnmapWindow(dpy, client.frame);

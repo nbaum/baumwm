@@ -130,6 +130,7 @@ void map (XMapRequestEvent& event)
   XSetWMState(client, 1);
   XSetWindowBorderWidth(dpy, client.child, 0);
   update_name(client);
+  client.mapped = true;
 }
 
 void destroy (XDestroyWindowEvent& event)
@@ -145,6 +146,7 @@ void unmap (XUnmapEvent& event)
     XSetWMState(client, 0);
     if (&client == focused)
       focused = 0;
+    client.mapped = false;
   }
 }
 
