@@ -102,6 +102,9 @@ int main (int argc, const char *argv[])
   grab_key(dpy, root, "M-C-S-7");
   grab_key(dpy, root, "M-C-S-8");
   grab_key(dpy, root, "M-C-S-9");
+  grab_key(dpy, root, "M-t");
+  grab_key(dpy, root, "M-comma");
+  grab_key(dpy, root, "M-period");
   grab_button(dpy, root, "M-1");
   grab_button(dpy, root, "M-2");
   grab_button(dpy, root, "M-S-2");

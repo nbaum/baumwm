@@ -9,6 +9,7 @@ void set_desktop (uint32_t num)
     if (&client) {
       if (client.desktop & num && client.mapped) {
         XMapWindow(dpy, client.frame);
+        XDrawFrame(client, &client == focused);
       } else {
         XUnmapWindow(dpy, client.frame);
       }

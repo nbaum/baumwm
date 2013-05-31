@@ -276,6 +276,22 @@ void key_press (XKeyPressedEvent& event)
     XLowerWindow(dpy, event.subwindow);
   } else if (match_key(event, "M-Next")) {
     XRaiseWindow(dpy, event.subwindow);
+  } else if (match_key(event, "M-t")) {
+    if (client.desktop == -1) {
+      set_desktop(client, current_desktop);
+    } else {
+      set_desktop(client, -1);
+    }
+  } else if (match_key(event, "M-comma")) {
+    current_desktop >>= 1;
+    if (current_desktop == 0)
+      current_desktop = 256;
+    set_desktop(current_desktop);
+  } else if (match_key(event, "M-period")) {
+    current_desktop <<= 1;
+    if (current_desktop == 512)
+      current_desktop = 1;
+    set_desktop(current_desktop);
   }
 }
 
