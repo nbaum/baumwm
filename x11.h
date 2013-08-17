@@ -24,6 +24,11 @@ T getprop (Window w, const char *name, const T2 def)
   return val;
 }
 
+Atom atom (const char *name)
+{
+  return XInternAtom(dpy, name, False);
+}
+
 XineramaScreenInfo *screens;
 
 XineramaScreenInfo *find_screen (int x, int y)
@@ -35,7 +40,7 @@ XineramaScreenInfo *find_screen (int x, int y)
     if (y > screens[i].y_org + screens[i].height) continue;
     return &screens[i]; 
   }
-  return 0;
+  return &screens[0];
 }
 
 XPoint pointer ()

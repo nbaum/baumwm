@@ -68,6 +68,18 @@ void XDrawFrame (XClient& client, bool active)
   XDrawString(dpy, client.frame, client.gc, client.width - w - 4, 14, buff, strlen(buff));
 }
 
+void XDeleteClient (Window w)
+{
+  XClientMessageEvent cme;
+  cme.type = ClientMessage;
+  cme.window = w;
+  cme.message_type = atom("WM_PROTOCOLS");
+  cme.format = 32;
+  cme.data.l[0] = atom("WM_DELETE_WINDOW");
+  cme.data.l[1] = 0;
+  XSendEvent(dpy, w, false, 0, (XEvent *) &cme);
+}
+
 void XDestroyClient (Window w)
 {
   auto c = clients[w];
@@ -271,6 +283,6 @@ void fill (XClient& client)
       if (c.left > client.right) max_x = std::min(max_x, c.left);
       if (c.right < client.left) min_x = std::max(min_x, c.right);
     }
-  }  
+  }
   move_resize(client, min_x + 5, min_y + 5, max_x - min_x - 20, max_y - min_y - HeadlineHeight - 16);
 }

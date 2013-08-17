@@ -253,6 +253,8 @@ void key_press (XKeyPressedEvent& event)
   } else if (match_key(event, "M-Return")) {
     spawn(getenv("TERMINAL", "gnome-terminal"));
   } else if (match_key(event, "M-c")) {
+    XDeleteClient(client.child);
+  } else if (match_key(event, "M-S-c")) {
     XDestroyClient(client.child);
   } else if (match_key(event, "M-q")) {
     exit(0);
@@ -302,4 +304,3 @@ int error (Display *dpy, XErrorEvent *error)
   fprintf(stderr, "%s\n", buff);
   return 0;
 }
-
