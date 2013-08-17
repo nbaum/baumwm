@@ -259,6 +259,8 @@ void fill (XClient& client)
   int max_y = current_screen()->height + min_y;
   for (auto i = clients.begin(); i != clients.end(); ++i) {
     auto &c = *i->second;
+    if (!&c)
+      continue;
     if (&c == &client || (c.desktop & client.desktop) == 0)
       continue;
     if (overlap(c.left, c.right, client.left, client.right)) {
