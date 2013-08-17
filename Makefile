@@ -17,3 +17,4 @@ clean:
 
 main.cpp: util.h
 
+main.o: main.cpp  client.h  config.h  event.h  util.h  variables.h  window.h  workspaces.h  x11.h
