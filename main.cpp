@@ -26,6 +26,13 @@ int main (int argc, const char *argv[])
   if (!(dpy = XOpenDisplay(0)))
     err(1, "failed to start");
   screens = XineramaQueryScreens(dpy, &screen_count);
+  if (!screens) {
+    screens = new XineramaScreenInfo[1];
+    screens->x_org = 0;
+    screens->y_org = 0;
+    screens->width = WidthOfScreen(XDefaultScreenOfDisplay(dpy));
+    screens->height = HeightOfScreen(XDefaultScreenOfDisplay(dpy));
+  }
   XSynchronize(dpy, True);
   current_desktop = 1;
   active_frame_pixel   = XMakeColor(dpy, XGetDefault(dpy, "admiral", "active-color", "rgb:f/4/2"));
