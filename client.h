@@ -104,6 +104,14 @@ void XDestroyClient (Window w)
   delete c;
 }
 
+struct MotifWmHints {
+   unsigned long flags;
+   unsigned long functions;
+   unsigned long decorations;
+   long input_mode;
+   unsigned long status;
+};
+
 void ProcessHints (XClient& client)
 {
   long mask;
@@ -117,7 +125,12 @@ void ProcessHints (XClient& client)
     client.hints.base_width = client.hints.min_width;
   if ((client.hints.flags & PResizeInc) == 0)
     client.hints.width_inc = client.hints.height_inc = 1;
-  auto &h = client.hints;
+  MotifWmHints mh;
+  client.undecorated = false;
+  if (getstruct(client.child, "_MOTIF_WM_HINTS", 32, mh)) {
+    if ((mh.flags & 2) == 2)
+      client.undecorated = mh.decorations == 0;
+  }
 }
 
 void unfocus (XClient& client)
@@ -154,6 +167,7 @@ XClient& XFindClient (Window w, bool create)
     XSetFont(dpy, c->gc, fs->fid);
     XSelectInput(dpy, frame, ButtonPressMask | ExposureMask | EnterWindowMask | SubstructureNotifyMask | SubstructureRedirectMask);
     XSelectInput(dpy, w, PropertyChangeMask | StructureNotifyMask);
+    c->undecorated = WindowType(w) == atom("_NET_WM_WINDOW_TYPE_DOCK");
     ProcessHints(*c);
     clients[frame] = clients[w] = c;
     unfocus(*c);
@@ -260,6 +274,7 @@ void move_resize (XClient& client, int x, int y, int width, int height)
     client.height = height;
     client.right = x + client.width;
     client.bottom = y + client.height;
+    setprop(client.child, "_NET_FRAME_EXTENTS", (long[]){BorderWidth, BorderWidth, BorderWidth + HeadlineHeight, BorderWidth});
   }
 }
 

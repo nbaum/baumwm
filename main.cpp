@@ -50,7 +50,10 @@ int main (int argc, const char *argv[])
       auto &client = XFindClient(children[j], True);
       client.mapped = true;
       update_name(client);
-      move_resize(client, attr.x - BorderWidth, attr.y - HeadlineHeight - BorderWidth, attr.width, attr.height);
+      if (!client.undecorated)
+        move_resize(client, attr.x - BorderWidth, attr.y - HeadlineHeight - BorderWidth, attr.width, attr.height);
+      else
+        move_resize(client, attr.x, attr.y, attr.width, attr.height);
       auto num = getprop<long>(client.child, "_NET_WM_DESKTOP", -1);
       XSetWindowBorderWidth(dpy, client.child, 0);
       XMapWindow(dpy, client.child);
@@ -59,7 +62,6 @@ int main (int argc, const char *argv[])
       XClearWindow(dpy, client.frame);
       XSetWMState(client, 1);
       update_name(client);
-      printf("%ix%i+%i+%i: %s\n", attr.width, attr.height, attr.x, attr.y, client.title.c_str());
     }
   }
   XSelectInput(dpy, root, FocusChangeMask | ButtonPressMask | KeyPressMask | SubstructureRedirectMask);
