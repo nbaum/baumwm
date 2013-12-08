@@ -177,7 +177,7 @@ void property (XPropertyEvent& event)
 
 void key_press (XKeyPressedEvent& event)
 {
-  auto &client = XFindClient(event.subwindow, False);
+  auto &client = XFindClient(event.subwindow, False, true);
   if (match_key(event, "M-1")) {
     set_desktop(1);
   } else if (match_key(event, "M-2")) {
@@ -258,6 +258,9 @@ void key_press (XKeyPressedEvent& event)
     XDestroyClient(client.child);
   } else if (match_key(event, "M-q")) {
     execlp(command, command, 0);
+  } else if (match_key(event, "M-s")) {
+    client.shaded = !client.shaded;
+    move_resize(client, client.x, client.y, client.width, client.height);
   } else if (match_key(event, "M-f")) {
     client.undecorated = false;
     current_screen();
