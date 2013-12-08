@@ -4,7 +4,7 @@ LD=clang++ -std=c++11
 all: admiral.bin
 
 admiral.bin: main.o
-	$(LD) $(LDFLAGS) $(shell pkg-config --libs x11 xinerama) -o$@ $?
+	$(LD) $(LDFLAGS) $(shell pkg-config --libs x11 xinerama cairo) -o$@ $?
 
 %.o: %.cpp
 	$(CXX) -c -o$@ $(CXXFLAGS) $<

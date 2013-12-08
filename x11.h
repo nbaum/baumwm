@@ -1,10 +1,21 @@
 
+Atom atom (const char *name)
+{
+  return XInternAtom(dpy, name, False);
+}
+
 template<typename T, typename T2>
 void setprop (Window w, const char *name, const T2 &value)
 {
   auto atom = XInternAtom(dpy, name, True);
   T temp = value;
   XChangeProperty(dpy, w, atom, atom, 8, PropModeReplace, (unsigned char *) &temp, sizeof(temp));
+}
+
+template<int I>
+void setprop (Window w, const char *name, const long (&value)[I])
+{
+  XChangeProperty(dpy, w, atom(name), atom("CARDINAL"), 32, PropModeReplace, (unsigned char *) value, I);
 }
 
 template<typename T, typename T2>
@@ -35,7 +46,7 @@ bool hasprop (Window w, const char *name)
                      False, AnyPropertyType,
                      &type, &format, &items, &bytes,
                      (unsigned char **) &prop);
-  return type != None;
+  return bytes != 0;
 }
 
 int proplen (Window w, const char *name)
@@ -50,6 +61,23 @@ int proplen (Window w, const char *name)
                      &type, &format, &items, &bytes,
                      (unsigned char **) &prop);
   return bytes;
+}
+
+template<typename T>
+bool getstruct (Window w, const char *name, int format, T &data)
+{
+  if (hasprop(w, name)) {
+    unsigned char *prop;
+    Atom type;
+    int format;
+    unsigned long items, bytes;
+    XGetWindowProperty(dpy, w, atom(name), 0, sizeof(data), False, AnyPropertyType, &type, &format, &items, &bytes, &prop);
+    memcpy(&data, prop, sizeof(data));
+    XFree(prop);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 template<>
@@ -72,9 +100,14 @@ std::string getprop<std::string, const char *> (Window w, const char *name, cons
   }
 }
 
-Atom atom (const char *name)
+std::string getstring (Window w, const char *name, const char *def)
 {
-  return XInternAtom(dpy, name, False);
+  return getprop<std::string, const char *>(w, name, def);
+}
+
+Atom WindowType (Window w)
+{
+  return getprop<Atom, Atom>(w, "_NET_WM_WINDOW_TYPE", atom("_NET_WM_WINDOW_TYPE_NORMAL"));
 }
 
 XineramaScreenInfo *screens;
