@@ -1,10 +1,5 @@
 #include <sstream>
 
-struct Geom : XRectangle
-{
-  bool fullscreen;
-};
-
 struct XClient
 {
   Window frame, child;
@@ -18,7 +13,6 @@ struct XClient
   bool undecorated;
   uint32_t desktop;
   XSizeHints hints;
-  std::map<int, Geom> geom;
   bool mapped;
 };
 
@@ -30,42 +24,40 @@ XFontStruct *fs;
 
 void XDrawFrame (XClient& client, bool active)
 {
-  unsigned int color;
-  int w = client.width + 8, h = client.height + 4 + HeadlineHeight;
-  if (client.fullscreen)
-    w = client.fullscreen->width, h = client.fullscreen->height;
-  if (active)
-    color = active_frame_pixel;
-  else
-    color = inactive_frame_pixel;
-  XSetForeground(dpy, client.gc, color);
-  XFillRectangle(dpy, client.frame, client.gc, 0, 0, w, h);
-  XSetForeground(dpy, client.gc, BlackPixel(dpy, 0));
-  XDrawRectangle(dpy, client.frame, client.gc, 3, HeadlineHeight - 1, w - 7, h - HeadlineHeight - 3);
-  XSetForeground(dpy, client.gc, frame_text_pixel);
-  XDrawString(dpy, client.frame, client.gc, 4, 14, client.title.c_str(), client.title.length());
-  char buff[100] = "";
-  strcat(buff, "[");
-#define FOO(x) \
-  if (client.desktop & (1 << (x - 1))) { \
-    if (buff[1] != 0) \
-      strcat(buff, ", "); \
-    strcat(buff, # x); \
-    if (current_desktop & (1 << (x - 1)))\
-      strcat(buff, "*"); \
+  int w = client.width + BorderWidth * 2 - 1,
+      h = client.height + BorderWidth * 2 + HeadlineHeight - 1,
+      t = BorderWidth + HeadlineHeight - 1,
+      l = BorderWidth - 1,
+      b = h - l,
+      r = w - l;
+  int color = 0x44, tint = 0x33, text = 0xCC;
+  if (active) {
+    color = 0xDD;
+    tint = 0x22;
+    text = 0x22;
   }
-  FOO(1);
-  FOO(2);
-  FOO(3);
-  FOO(4);
-  FOO(5);
-  FOO(6);
-  FOO(7);
-  FOO(8);
-  FOO(9);
-  strcat(buff, "]");
-  w = XTextWidth(fs, buff, strlen(buff));
-  XDrawString(dpy, client.frame, client.gc, client.width - w - 4, 14, buff, strlen(buff));
+  XSetForeground(dpy, client.gc, rgb(color));
+  XFillRectangle(dpy, client.frame, client.gc, 0, 0, w, h);
+  XSetForeground(dpy, client.gc, rgb(color - tint));
+  XDrawLine(dpy, client.frame, client.gc, l, t, r, t);
+  XDrawLine(dpy, client.frame, client.gc, l, t, l, b);
+  XSetForeground(dpy, client.gc, rgb(color + tint));
+  XDrawLine(dpy, client.frame, client.gc, r, t, r, b);
+  XDrawLine(dpy, client.frame, client.gc, l, b, r, b);
+  XSetForeground(dpy, client.gc, rgb(color - tint));
+  XDrawLine(dpy, client.frame, client.gc, w, 0, w, h);
+  XDrawLine(dpy, client.frame, client.gc, 0, h, w, h);
+  XSetForeground(dpy, client.gc, rgb(color + tint));
+  XDrawLine(dpy, client.frame, client.gc, 0, 0, w, 0);
+  XDrawLine(dpy, client.frame, client.gc, 0, 0, 0, h);
+  XSetForeground(dpy, client.gc, rgb(text));
+  XDrawString(dpy, client.frame, client.gc, BorderWidth * 2, 17, client.title.c_str(), client.title.length());
+  std::stringstream ss;
+  if ((client.desktop & 0x3) == 0x3)
+    ss << "*";
+  ss << __builtin_ctz(current_desktop) + 1;
+  w = XTextWidth(fs, ss.str().c_str(), ss.str().length());
+  XDrawString(dpy, client.frame, client.gc, client.width - w, 17, ss.str().c_str(), ss.str().length());
 }
 
 void XDeleteClient (Window w)
@@ -117,7 +109,6 @@ XClient& XFindClient (Window w, bool create)
 {
   auto c = clients[w];
   if (!c && create) {
-    XWindowAttributes attr;
     auto frame = XCreateWindow(dpy, root, 0, 0, 1, 1, 1, CopyFromParent,
                                InputOutput, CopyFromParent, 0, 0);
     c = new XClient { .frame = frame, .child = w, .desktop = getprop<unsigned int>(w, "_NET_WM_DESKTOP", current_desktop) };
@@ -136,7 +127,8 @@ XClient& XFindClient (Window w, bool create)
     int num;
     Atom *atoms = XListProperties(dpy, w, &num);
     c->gc = XCreateGC(dpy, w, 0, 0);
-    if (!fs) fs = XLoadQueryFont(dpy, "-*-profont-*-*-*-*-12-*-*-*-*-*-*-*");
+    //if (!fs) fs = XLoadQueryFont(dpy, "-*-profont-*-*-*-*-12-*-*-*-*-*-*-*");
+    if (!fs) fs = XLoadQueryFont(dpy, "-*-helvetica-medium-r-*-*-12-*-*-*-*-*-*-*");
     XSetFont(dpy, c->gc, fs->fid);
     XSelectInput(dpy, frame, ButtonPressMask | ExposureMask | EnterWindowMask | SubstructureNotifyMask | SubstructureRedirectMask);
     XSelectInput(dpy, w, PropertyChangeMask | StructureNotifyMask);
@@ -150,13 +142,17 @@ XClient& XFindClient (Window w, bool create)
 
 void update_name (XClient &client)
 {
-  char *name;
-  XFetchName(dpy, client.child, &name);
-  if (name) {
-    client.title = name;
-    XFree(name);
+  if (hasprop(client.child, "_NET_WM_NAME")) {
+    client.title = getprop<std::string>(client.child, "_NET_WM_NAME", "");
   } else {
-    client.title = "Untitled Window";
+    char *name;
+    XFetchName(dpy, client.child, &name);
+    if (name) {
+      client.title = name;
+      XFree(name);
+    } else {
+      client.title = "Untitled Window";
+    }
   }
   XDrawFrame(client, &client == focused);
 }
@@ -203,36 +199,40 @@ void move_resize (XClient& client, int x, int y, int width, int height)
     } else {
       XMoveResizeWindow(dpy, client.frame, x, y, width, height);
       XSetWindowBorderWidth(dpy, client.frame, 0);
-      XMoveResizeWindow(dpy, client.child, 4, HeadlineHeight, width - 8, height - HeadlineHeight - 4);
+      XMoveResizeWindow(dpy, client.child, BorderWidth, BorderWidth,
+                             width + BorderWidth * 2,
+                             height + HeadlineHeight + BorderWidth * 2);
       XConfigureEvent ev = {
         .type = ConfigureNotify,
         .event = client.child,
         .window = client.child,
-        .x = x + 4,
-        .y = y + HeadlineHeight,
-        .width = width - 8,
-        .height = height - HeadlineHeight - 4
+        .x = x + BorderWidth,
+        .y = y + BorderWidth + HeadlineHeight,
+        .width = width,
+        .height = height
       };
       XSendEvent(dpy, client.child, False, StructureNotifyMask, (XEvent *) &ev);
     }
   } else {
-    width = std::min(std::max(std::max(15, client.hints.min_width), width), client.hints.max_width);
-    height = std::min(std::max(std::max(15, client.hints.min_height), height), client.hints.max_width);
     if (client.undecorated) {
       XMoveResizeWindow(dpy, client.frame, x, y, width, height);
       XSetWindowBorderWidth(dpy, client.frame, 0);
       XMoveResizeWindow(dpy, client.child, 0, 0, width, height);
     } else {
-      XMoveResizeWindow(dpy, client.frame, x, y, width + 8, height + HeadlineHeight + 4);
-      XSetWindowBorderWidth(dpy, client.frame, 1);
-      XMoveResizeWindow(dpy, client.child, 4, HeadlineHeight, width, height);
+      XMoveResizeWindow(dpy, client.frame, x, y,
+                        width + BorderWidth * 2,
+                        height + HeadlineHeight + BorderWidth * 2);
+      XSetWindowBorderWidth(dpy, client.frame, 0);
+      XMoveResizeWindow(dpy, client.child, BorderWidth, BorderWidth + HeadlineHeight,
+                        width,
+                        height);
     }
     XConfigureEvent ev = {
       .type = ConfigureNotify,
       .event = client.child,
       .window = client.child,
-      .x = x + 4,
-      .y = y + HeadlineHeight,
+      .x = x + BorderWidth,
+      .y = y + BorderWidth + HeadlineHeight,
       .width = width,
       .height = height
     };
@@ -241,8 +241,8 @@ void move_resize (XClient& client, int x, int y, int width, int height)
     client.y = y;
     client.width = width;
     client.height = height;
-    client.right = x + width + 10;
-    client.bottom = y + height + HeadlineHeight + 6;
+    client.right = x + client.width;
+    client.bottom = y + client.height;
   }
 }
 

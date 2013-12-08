@@ -24,6 +24,54 @@ T getprop (Window w, const char *name, const T2 def)
   return val;
 }
 
+bool hasprop (Window w, const char *name)
+{
+  auto atom = XInternAtom(dpy, name, False);
+  void *prop;
+  Atom type;
+  int format;
+  unsigned long items, bytes;
+  XGetWindowProperty(dpy, w, atom, 0, 0,
+                     False, AnyPropertyType,
+                     &type, &format, &items, &bytes,
+                     (unsigned char **) &prop);
+  return type != None;
+}
+
+int proplen (Window w, const char *name)
+{
+  auto atom = XInternAtom(dpy, name, False);
+  const char *prop;
+  Atom type;
+  int format;
+  unsigned long items, bytes;
+  XGetWindowProperty(dpy, w, atom, 0, 0,
+                     False, AnyPropertyType,
+                     &type, &format, &items, &bytes,
+                     (unsigned char **) &prop);
+  return bytes;
+}
+
+template<>
+std::string getprop<std::string, const char *> (Window w, const char *name, const char *def)
+{
+  if (hasprop(w, name)) {
+    auto atom = XInternAtom(dpy, name, False);
+    const char *prop, *val;
+    Atom type;
+    int format;
+    int len = proplen(w, name);
+    unsigned long items, bytes;
+    XGetWindowProperty(dpy, w, atom, 0, len,
+                       False, AnyPropertyType,
+                       &type, &format, &items, &bytes,
+                       (unsigned char **) &prop);
+    return prop;
+  } else {
+    return def;
+  }
+}
+
 Atom atom (const char *name)
 {
   return XInternAtom(dpy, name, False);
@@ -36,8 +84,8 @@ XineramaScreenInfo *find_screen (int x, int y)
   for (int i = 0; i < screen_count; ++i) {
     if (x < screens[i].x_org) continue;
     if (y < screens[i].y_org) continue;
-    if (x > screens[i].x_org + screens[i].width) continue;
-    if (y > screens[i].y_org + screens[i].height) continue;
+    if (x > screens[i].x_org + screens[i].width - 1) continue;
+    if (y > screens[i].y_org + screens[i].height - 1) continue;
     return &screens[i]; 
   }
   return &screens[0];

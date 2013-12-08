@@ -37,7 +37,7 @@ int main (int argc, const char *argv[])
   current_desktop = 1;
   active_frame_pixel   = XMakeColor(dpy, XGetDefault(dpy, "admiral", "active-color", "rgb:f/4/2"));
   frame_text_pixel     = XMakeColor(dpy, XGetDefault(dpy, "admiral", "text-color", "rgb:f/f/f"));
-  inactive_frame_pixel = XMakeColor(dpy, XGetDefault(dpy, "admiral", "inactive-color", "rgb:8/8/8"));
+  inactive_frame_pixel = XMakeColor(dpy, XGetDefault(dpy, "admiral", "inactive-color", "rgb:a/a/a"));
   root = DefaultRootWindow(dpy);
   Window *children, parent;
   unsigned int nchildren;
@@ -50,7 +50,7 @@ int main (int argc, const char *argv[])
       auto &client = XFindClient(children[j], True);
       client.mapped = true;
       update_name(client);
-      move_resize(client, attr.x - 5, attr.y - HeadlineHeight - 1, attr.width, attr.height);
+      move_resize(client, attr.x - BorderWidth, attr.y - HeadlineHeight - BorderWidth, attr.width, attr.height);
       auto num = getprop<long>(client.child, "_NET_WM_DESKTOP", -1);
       XSetWindowBorderWidth(dpy, client.child, 0);
       XMapWindow(dpy, client.child);
@@ -59,6 +59,7 @@ int main (int argc, const char *argv[])
       XClearWindow(dpy, client.frame);
       XSetWMState(client, 1);
       update_name(client);
+      printf("%ix%i+%i+%i: %s\n", attr.width, attr.height, attr.x, attr.y, client.title.c_str());
     }
   }
   XSelectInput(dpy, root, FocusChangeMask | ButtonPressMask | KeyPressMask | SubstructureRedirectMask);

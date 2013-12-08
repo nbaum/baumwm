@@ -113,13 +113,13 @@ void configure (XConfigureRequestEvent& event)
     s = current_screen();
     client.x += s->x_org;
     client.y += s->y_org;
+    printf("%dx%d+%d+%d\n", client.width, client.height, client.x, client.y);
   }
   if (event.value_mask & CWWidth) client.width = event.width;
   if (event.value_mask & CWHeight) client.height = event.height;
   move_resize(client, client.x, client.y, client.width, client.height);
   XSetWindowBorderWidth(dpy, client.child, 0);
 }
-
 
 void map (XMapRequestEvent& event)
 {
@@ -257,7 +257,6 @@ void key_press (XKeyPressedEvent& event)
   } else if (match_key(event, "M-S-c")) {
     XDestroyClient(client.child);
   } else if (match_key(event, "M-q")) {
-    exit(0);
     execlp(command, command, 0);
   } else if (match_key(event, "M-f")) {
     client.undecorated = false;
