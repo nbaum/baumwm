@@ -175,6 +175,43 @@ void property (XPropertyEvent& event)
   update_name(client);
 }
 
+void focus_towards (int x, int y)
+{
+  long nearest_distance = 10000000;
+  XClient *nearest_client = 0;
+  for (auto i = clients.begin(); i != clients.end(); ++i) {
+    auto &client = *i->second;
+    auto ccursor = client.cursor();
+    if (i->first == client.child) continue;
+    if ((client.desktop & current_desktop) == 0) continue;
+    if (focused == &client) continue;
+    if (!client.mapped) continue;
+    if (focused && x) {
+      if (   (focused->top < client.top && focused->bottom < client.top)
+          || (focused->top > client.bottom && focused->bottom > client.bottom))
+        continue; 
+    }
+    if (focused && y) {
+      if ((focused->left < client.left && focused->right < client.left) || (focused->left > client.right && focused->right > client.right))
+        continue; 
+    }
+    if ((x == -1) && (ccursor.x >= cursor.x)) continue;
+    if ((x == 1) && (ccursor.x <= cursor.x)) continue;
+    if ((y == -1) && (ccursor.y >= cursor.y)) continue;
+    if ((y == 1) && (ccursor.y <= cursor.y)) continue;
+    auto dist = ccursor.dist(cursor, 1, 1);
+    if ((nearest_distance == -1) || (dist < nearest_distance)) {
+      nearest_distance = dist;
+      nearest_client = &client;
+    }
+  }
+  if (nearest_client) {
+    printf("%li\n", nearest_distance);
+    focus(*nearest_client, nearest_client->child, y*y, x*x);
+    XRaiseWindow(dpy, nearest_client->frame);
+  }
+}
+
 void key_press (XKeyPressedEvent& event)
 {
   auto &client = XFindClient(event.subwindow, False, true);
@@ -296,6 +333,14 @@ void key_press (XKeyPressedEvent& event)
     if (current_desktop == 512)
       current_desktop = 1;
     set_desktop(current_desktop);
+  } else if (match_key(event, "M-Left")) {
+    focus_towards(-1, 0);
+  } else if (match_key(event, "M-Right")) {
+    focus_towards(1, 0);
+  } else if (match_key(event, "M-Up")) {
+    focus_towards(0, -1);
+  } else if (match_key(event, "M-Down")) {
+    focus_towards(0, 1);
   }
 }
 

@@ -35,3 +35,4 @@ void flip_desktop (XClient& client, uint32_t num)
 {
   set_desktop(client, client.desktop ^ num);
 }
+

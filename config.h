@@ -1,5 +1,5 @@
 
-const int BorderWidth = 4;
+const int BorderWidth = 5;
 const int HeadlineHeight = 20;
 const int ModMask = Mod4Mask;
 

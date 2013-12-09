@@ -41,7 +41,7 @@ int main (int argc, const char *argv[])
   root = DefaultRootWindow(dpy);
   Window *children, parent;
   unsigned int nchildren;
-  current_desktop = getprop<long>(root, "_NET_CURRENT_DESKTOP", -1);
+  current_desktop = getprop<long>(root, "_NET_CURRENT_DESKTOP", 1);
   XQueryTree(dpy, root, &root, &parent, &children, &nchildren);
   for (int j = 0; j < nchildren; j++) {
     XWindowAttributes attr;
@@ -68,6 +68,10 @@ int main (int argc, const char *argv[])
   XDefineCursor(dpy, root, XCreateFontCursor(dpy, XC_left_ptr));
   XSetWindowBackground(dpy, root, XMakeColor(dpy, "rgb:4/6/8"));
   XClearWindow(dpy, root);
+  grab_key(dpy, root, "M-Left");
+  grab_key(dpy, root, "M-Right");
+  grab_key(dpy, root, "M-Up");
+  grab_key(dpy, root, "M-Down");
   grab_key(dpy, root, "M-Return");
   grab_key(dpy, root, "M-c");
   grab_key(dpy, root, "M-q");
@@ -75,6 +79,7 @@ int main (int argc, const char *argv[])
   grab_key(dpy, root, "M-m");
   grab_key(dpy, root, "M-u");
   grab_key(dpy, root, "M-r");
+  grab_key(dpy, root, "M-s");
   grab_key(dpy, root, "M-Prior");
   grab_key(dpy, root, "M-Next");
   grab_key(dpy, root, "M-1");

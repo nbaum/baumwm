@@ -2,6 +2,13 @@
 #include <cairo/cairo.h>
 #include <cairo/cairo-xlib.h>
 
+struct cursor_t {
+  int x, y;
+  long dist (const cursor_t &c, int scale_x, int scale_y) {
+    return (c.x - x) * (c.x - x) * scale_x + (c.y - y) * (c.y - y) * scale_y;
+  }
+} cursor;
+
 struct XClient
 {
   Window frame, child;
@@ -17,9 +24,24 @@ struct XClient
   XSizeHints hints;
   bool mapped;
   bool shaded;
+  cursor_t cursor () {
+    return (cursor_t) { x + width / 2, y + height / 2 };
+  }
+  cursor_t cursor (int dx, int dy) {
+    if (dx == -1) return (cursor_t) { x, y + height / 2 };
+    if (dx == 1) return (cursor_t) { x + width, y + height / 2 };
+    if (dy == -1) return (cursor_t) { x + width / 2, y };
+    if (dy == 1) return (cursor_t) { x + width / 2, y + height };
+    return cursor();
+  }
 };
 
 std::map<Window, XClient *> clients;
+
+bool IsClient (Window w)
+{
+  return clients.find(w) != clients.end();
+}
 
 XClient *focused;
 
@@ -65,14 +87,14 @@ void XDrawFrame (XClient& client, bool active)
     auto cs = cairo_xlib_surface_create(dpy, client.frame, XDefaultVisual(dpy, XDefaultScreen(dpy)), w, h);
     auto c = cairo_create(cs);
     cairo_set_source_rgb(c, text, text, text);
-    cairo_move_to(c, BorderWidth * 2, HeadlineHeight - BorderWidth);
+    cairo_move_to(c, BorderWidth * 2, HeadlineHeight - BorderWidth + 1);
     cairo_show_text(c, client.title.c_str());
     std::stringstream ss;
     if ((client.desktop & 0x3) == 0x3) ss << "*";
     ss << "[" << __builtin_ctz(current_desktop) + 1 << "]";
     cairo_text_extents_t te;
     cairo_text_extents(c, ss.str().c_str(), &te);
-    cairo_move_to(c, w - te.x_advance - BorderWidth * 2, HeadlineHeight - BorderWidth);
+    cairo_move_to(c, w - te.x_advance - BorderWidth * 2, HeadlineHeight - BorderWidth + 1);
     cairo_show_text(c, ss.str().c_str());
   }
 }
@@ -91,8 +113,8 @@ void XDeleteClient (Window w)
 
 void XDestroyClient (Window w)
 {
+  if (IsClient(w)) return;
   auto c = clients[w];
-  if (!c) return;
   XDestroyWindow(dpy, c->frame);
   clients.erase(c->frame);
   clients.erase(c->child);
@@ -137,11 +159,12 @@ void set_desktop (XClient& client, uint32_t num);
 
 XClient& XFindClient (Window w, bool create, bool focus = false)
 {
-  auto c = clients[w];
-  if (!c && create) {
+  if (IsClient(w)) {
+    return *clients[w];
+  } else if (create) {
     auto frame = XCreateWindow(dpy, root, 0, 0, 1, 1, 1, CopyFromParent,
                                InputOutput, CopyFromParent, 0, 0);
-    c = new XClient { .frame = frame, .child = w, .desktop = getprop<unsigned int>(w, "_NET_WM_DESKTOP", current_desktop) };
+    auto c = new XClient { .frame = frame, .child = w, .desktop = getprop<unsigned int>(w, "_NET_WM_DESKTOP", current_desktop) };
     auto s = current_screen();
     c->width = s->width / 3;
     c->height = s->height / 3;
@@ -167,10 +190,13 @@ XClient& XFindClient (Window w, bool create, bool focus = false)
     clients[frame] = clients[w] = c;
     unfocus(*c);
     set_desktop(*c, c->desktop);
+    return *c;
   } else if (focus) {
     return *focused;
+  } else {
+    XClient *c = 0;
+    return *c;
   }
-  return *c;
 }
 
 void update_name (XClient &client)
@@ -185,7 +211,7 @@ void update_name (XClient &client)
   XDrawFrame(client, &client == focused);
 }
 
-void focus (XClient& client, Window window = None)
+void focus (XClient& client, Window window = None, bool lockx = false, bool locky = false)
 {
   if (focused)
     unfocus(*focused);
@@ -197,6 +223,14 @@ void focus (XClient& client, Window window = None)
     XSetInputFocus(dpy, client.child, RevertToPointerRoot, CurrentTime);
     focused = &client;
     XDrawFrame(client, true);
+    if (!lockx)
+      cursor.x = client.cursor().x;
+    //else
+    //  cursor.x = std::max(client.left, std::min(client.right, cursor.x));
+    if (!locky)
+      cursor.y = client.cursor().y;
+    //else
+    //  cursor.y = std::max(client.top, std::min(client.bottom, cursor.y));
   } else if (window) {
     XSetInputFocus(dpy, window, RevertToPointerRoot, CurrentTime);
     focused = 0;
